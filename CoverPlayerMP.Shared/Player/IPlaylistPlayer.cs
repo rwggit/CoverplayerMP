@@ -1,0 +1,26 @@
+namespace CoverPlayerMP.Shared.Player;
+
+public interface IPlaylistPlayer : IAsyncDisposable
+{
+    event EventHandler? StateChanged;
+
+    IReadOnlyList<Track> Tracks { get; }
+    Track? CurrentTrack { get; }
+    int CurrentIndex { get; }
+    double Position { get; }
+    double Duration { get; }
+    double Volume { get; set; }
+    double CrossfadeSeconds { get; set; }
+    bool IsPlaying { get; }
+    bool IsPaused { get; }
+    string? ErrorMessage { get; }
+
+    Task OpenPlaylistAsync(CancellationToken cancellationToken = default);
+    Task LoadPlaylistAsync(string pathOrContent, bool isContent = false, CancellationToken cancellationToken = default);
+    Task PlayAsync(int index = 0, CancellationToken cancellationToken = default);
+    Task PauseAsync(CancellationToken cancellationToken = default);
+    Task SeekAsync(double seconds, CancellationToken cancellationToken = default);
+    Task NextAsync(CancellationToken cancellationToken = default);
+    Task PreviousAsync(CancellationToken cancellationToken = default);
+    Task RestartAsync(CancellationToken cancellationToken = default);
+}

@@ -1,0 +1,212 @@
+@page "/"
+@implements IDisposable
+@inject IPlaylistPlayer Player
+@inject IJSRuntime Js
+
+<PageTitle>CoverPlayerMP</PageTitle>
+
+<div class="player-shell" @onclick="ShowControls">
+    <div class="bottom-hotspot" @onmouseenter="ShowControls"></div>
+    @if (!string.IsNullOrWhiteSpace(Player.ErrorMessage))
+    {
+        <div class="player-error" role="alert">@Player.ErrorMessage</div>
+    }
+    <div class="cover-stage">
+        @if (!string.IsNullOrWhiteSpace(coverUri))
+        {
+            <img class="cover-image" src="@coverUri" alt="Cover" />
+        }
+        else
+        {
+            <div class="cover-placeholder">♪</div>
+        }
+    </div>
+    <div class="track-caption">
+        <span>@(Player.CurrentTrack?.Artist ?? "CoverPlayerMP")</span>
+        <span class="caption-separator">—</span>
+        <span>@(Player.CurrentTrack?.Title ?? "Playlist auswählen")</span>
+    </div>
+
+    @if (controlsVisible)
+    {
+        <section class="control-dialog" @onclick:stopPropagation="true">
+            <div class="control-dialog-header">
+                <span>Player-Steuerung</span>
+                <button class="close-button" title="Steuerung ausblenden" @onclick="HideControls">×</button>
+            </div>
+            <div class="control-row timeline-row">
+                <span>@FormatTime(displayPosition)</span>
+                <input type="range"
+                       @key="Player.CurrentIndex"
+                       min="0"
+                       max="@durationValue.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                       step="0.1"
+                       value="@displayPosition.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                       @onpointerdown="BeginSeeking"
+                       @onpointerup="EndSeeking"
+                       @onpointercancel="EndSeeking"
+                       @oninput="OnSeekChanged" />
+                <span>@FormatTime(Player.Duration)</span>
+            </div>
+            <div class="control-toolbar">
+                <div class="control-buttons">
+                <button @onclick="OpenPlaylistAsync">Playlist öffnen</button>
+                <button @onclick="PreviousAsync" disabled="@(Player.Tracks.Count == 0)">Vorheriges</button>
+                <button @onclick="RestartAsync" disabled="@(Player.CurrentTrack is null)">Anfang</button>
+                <button class="play-button" @onclick="TogglePauseAsync" disabled="@(Player.CurrentTrack is null)">
+                    @(Player.IsPlaying ? "Pause" : "Wiedergabe")
+                </button>
+                <button @onclick="NextAsync" disabled="@(Player.Tracks.Count == 0)">Nächstes</button>
+                </div>
+                <label class="setting-row setting-inline">
+                    <span class="setting-icon"
+                          title="Dauer der Überblendung"
+                          aria-label="Dauer der Überblendung">↔</span>
+                    <span class="setting-value">@Player.CrossfadeSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) s</span>
+                    <input type="range" min="0" max="10" step="0.1"
+                           title="Dauer der Überblendung: @Player.CrossfadeSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) Sekunden"
+                           value="@Player.CrossfadeSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                           @oninput="OnCrossfadeChanged" />
+                </label>
+                <label class="setting-row setting-inline">
+                    <span class="setting-icon"
+                          title="Lautstärke: @Math.Round(Player.Volume * 100) Prozent"
+                          aria-label="Lautstärke">🔊</span>
+                    <span class="setting-value">@Math.Round(Player.Volume * 100) %</span>
+                    <input type="range" min="0" max="1" step="0.01"
+                           title="Lautstärke: @Math.Round(Player.Volume * 100) Prozent"
+                           value="@Player.Volume.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                           @oninput="OnVolumeChanged" />
+                </label>
+            </div>
+        </section>
+    }
+</div>
+
+@code {
+    private bool controlsVisible;
+    private string? coverUri;
+    private string? coverSource;
+    private double displayPosition;
+    private double durationValue;
+    private bool isSeeking;
+    private bool disposed;
+    private DotNetObjectReference<Home>? keyboardReference;
+
+    protected override void OnInitialized() => Player.StateChanged += OnPlayerStateChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        keyboardReference = DotNetObjectReference.Create(this);
+        await Js.InvokeVoidAsync("coverPlayerKeyboard.register", keyboardReference);
+    }
+
+    [JSInvokable]
+    public Task HandleKeyboardShortcut(string key) => key switch
+    {
+        "n" => NextAsync(),
+        "p" => PreviousAsync(),
+        "+" => ChangeVolumeAsync(.05),
+        "-" => ChangeVolumeAsync(-.05),
+        " " => TogglePauseAsync(),
+        _ => Task.CompletedTask
+    };
+
+    private void OnPlayerStateChanged(object? sender, EventArgs e)
+    {
+        if (disposed)
+            return;
+
+        if (!isSeeking)
+            displayPosition = Player.Position;
+
+        durationValue = Math.Max(0.1, Player.Duration);
+        var currentCoverSource = Player.CurrentTrack?.CoverSource;
+        if (!string.Equals(coverSource, currentCoverSource, StringComparison.Ordinal))
+        {
+            coverSource = currentCoverSource;
+            coverUri = currentCoverSource is not null ? CoverImage.ToDataUri(currentCoverSource) : null;
+        }
+
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void ShowControls()
+    {
+        controlsVisible = true;
+    }
+
+    private void HideControls()
+    {
+        controlsVisible = false;
+    }
+
+    private Task OpenPlaylistAsync() => Player.OpenPlaylistAsync();
+    private Task PreviousAsync() => Player.PreviousAsync();
+    private Task NextAsync() => Player.NextAsync();
+    private Task RestartAsync() => Player.RestartAsync();
+
+    private Task TogglePauseAsync() =>
+        Player.IsPlaying ? Player.PauseAsync() : Player.PlayAsync(Player.CurrentIndex);
+
+    private Task ChangeVolumeAsync(double delta)
+    {
+        Player.Volume = Math.Clamp(Player.Volume + delta, 0, 1);
+        return Task.CompletedTask;
+    }
+
+    private void BeginSeeking() => isSeeking = true;
+
+    private async Task OnSeekChanged(ChangeEventArgs args)
+    {
+        if (!double.TryParse(args.Value?.ToString(),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var value))
+            return;
+
+        displayPosition = Math.Clamp(value, 0, Math.Max(0, Player.Duration));
+        await Player.SeekAsync(displayPosition);
+    }
+
+    private void EndSeeking()
+    {
+        isSeeking = false;
+        displayPosition = Player.Position;
+    }
+
+    private void OnCrossfadeChanged(ChangeEventArgs args)
+    {
+        if (double.TryParse(args.Value?.ToString(),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var value))
+            Player.CrossfadeSeconds = Math.Clamp(value, 0, 10);
+    }
+
+    private void OnVolumeChanged(ChangeEventArgs args)
+    {
+        if (double.TryParse(args.Value?.ToString(),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var value))
+            Player.Volume = Math.Clamp(value, 0, 1);
+    }
+
+    private static string FormatTime(double seconds) =>
+        TimeSpan.FromSeconds(Math.Max(0, seconds)).ToString(seconds >= 3600 ? @"h\:mm\:ss" : @"m\:ss");
+
+    public void Dispose()
+    {
+        disposed = true;
+        Player.StateChanged -= OnPlayerStateChanged;
+        if (keyboardReference is not null)
+        {
+            _ = Js.InvokeVoidAsync("coverPlayerKeyboard.unregister");
+            keyboardReference.Dispose();
+        }
+    }
+}

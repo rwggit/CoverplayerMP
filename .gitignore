@@ -1,0 +1,13 @@
+.vs/
+
+# Local Visual Studio project settings
+*.csproj.user
+*.suo
+
+# .NET build output
+**/bin/
+**/obj/
+
+# Test and publish artifacts
+TestResults/
+artifacts/

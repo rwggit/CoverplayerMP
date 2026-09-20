@@ -1,0 +1,173 @@
+.player-shell {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background: #090a0f;
+    color: #f4f4f5;
+    font-family: system-ui, sans-serif;
+    user-select: none;
+}
+
+.bottom-hotspot {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 2;
+    height: 5rem;
+}
+
+.player-error {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    left: 1rem;
+    z-index: 10;
+    padding: .8rem 1rem;
+    border: 1px solid #a33d49;
+    border-radius: .6rem;
+    background: rgb(90 24 35 / 95%);
+    color: #fff;
+    text-align: center;
+}
+
+.cover-stage {
+    position: absolute;
+    inset: 0 0 3.5rem;
+    min-width: 0;
+    min-height: 0;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(circle, #272a35 0, #090a0f 75%);
+}
+
+.cover-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    object-fit: contain;
+}
+
+.cover-placeholder {
+    font-size: 12rem;
+    color: #555a6e;
+}
+
+.track-caption {
+    position: absolute;
+    right: 1rem;
+    bottom: 0;
+    left: 1rem;
+    display: flex;
+    gap: .5rem;
+    align-items: center;
+    justify-content: center;
+    min-height: 3.5rem;
+    font-size: clamp(1rem, 2.2vw, 1.5rem);
+    text-shadow: 0 1px 4px #000;
+}
+
+.caption-separator { color: #8c91a3; }
+
+.control-dialog {
+    position: absolute;
+    right: 1rem;
+    bottom: 4.25rem;
+    left: 1rem;
+    padding: .75rem 1.25rem 1rem;
+    border: 1px solid #51576d;
+    border-radius: 1rem;
+    background: rgb(24 27 37 / 95%);
+    box-shadow: 0 1rem 3rem rgb(0 0 0 / 45%);
+}
+
+.control-dialog-header {
+    display: flex;
+    min-height: 2.25rem;
+    align-items: center;
+    justify-content: space-between;
+    padding-right: 2.5rem;
+    color: #c9cde0;
+    font-size: .9rem;
+    font-weight: 600;
+}
+
+.close-button {
+    flex: 0 0 auto;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #fff;
+    font-size: 1.6rem;
+    cursor: pointer;
+}
+
+.control-row, .setting-row {
+    display: flex;
+    gap: .75rem;
+    align-items: center;
+    margin: .75rem 0;
+}
+
+.timeline-row input, .setting-row input { flex: 1; }
+.control-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem .75rem;
+    align-items: center;
+    justify-content: center;
+}
+.control-buttons { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; }
+.setting-inline {
+    flex: 0 1 10rem;
+    min-width: 8rem;
+    margin: 0;
+    gap: .4rem;
+    white-space: nowrap;
+}
+.setting-inline span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.setting-inline input {
+    flex: 0 1 5rem;
+    width: 5rem;
+    min-width: 4rem;
+}
+.setting-inline input[title^="Lautstärke"] {
+    flex-basis: 10rem;
+    width: 10rem;
+    min-width: 8rem;
+}
+.setting-icon {
+    flex: 0 0 1.5rem;
+    overflow: visible !important;
+    text-align: center;
+    font-size: 1.1rem;
+    cursor: help;
+}
+.setting-value {
+    flex: 0 0 auto;
+    min-width: 2.5rem;
+    overflow: visible !important;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+button {
+    padding: .55rem .85rem;
+    border: 1px solid #5c637b;
+    border-radius: .5rem;
+    background: #30364a;
+    color: #fff;
+    cursor: pointer;
+}
+button:hover { background: #46506d; }
+button:disabled { cursor: not-allowed; opacity: .45; }
+.play-button { background: #5b4acb; }

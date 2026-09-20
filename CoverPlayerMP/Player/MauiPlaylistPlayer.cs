@@ -1,0 +1,442 @@
+using Plugin.Maui.Audio;
+using CoverPlayerMP.Shared.Player;
+
+namespace CoverPlayerMP.Player;
+
+public sealed class MauiPlaylistPlayer : IPlaylistPlayer
+{
+    private readonly IAudioManager audioManager = AudioManager.Current;
+    private IAudioPlayer? audioPlayer;
+    private CancellationTokenSource? monitorCancellation;
+    private bool monitorRunning;
+    private readonly SemaphoreSlim transitionLock = new(1, 1);
+    private long transitionVersion;
+    private CancellationTokenSource? transitionRequestCancellation;
+    private bool isDisposed;
+    private List<Track> tracks = [];
+    private int currentIndex = -1;
+    private double volume = 1;
+    private double crossfadeSeconds = 2;
+
+    public event EventHandler? StateChanged;
+    public IReadOnlyList<Track> Tracks => tracks;
+    public Track? CurrentTrack => currentIndex >= 0 && currentIndex < tracks.Count ? tracks[currentIndex] : null;
+    public int CurrentIndex => currentIndex;
+    public double Position => audioPlayer?.CurrentPosition ?? 0;
+    public double Duration => audioPlayer?.Duration ?? 0;
+    public double Volume
+    {
+        get => volume;
+        set
+        {
+            if (isDisposed)
+                return;
+
+            volume = Math.Clamp(value, 0, 1);
+            if (audioPlayer is not null)
+                audioPlayer.Volume = volume;
+            RaiseStateChanged();
+        }
+    }
+    public double CrossfadeSeconds
+    {
+        get => crossfadeSeconds;
+        set => crossfadeSeconds = Math.Clamp(value, 0, 10);
+    }
+    public bool IsPlaying { get; private set; }
+    public bool IsPaused { get; private set; }
+    public string? ErrorMessage { get; private set; }
+
+    public async Task OpenPlaylistAsync(CancellationToken cancellationToken = default)
+    {
+        var result = await FilePicker.Default.PickAsync(new PickOptions
+        {
+            PickerTitle = "M3U-Playlist auswählen",
+            FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+            {
+                [DevicePlatform.WinUI] = [".m3u", ".m3u8"],
+                [DevicePlatform.Android] = ["audio/x-mpegurl", "application/vnd.apple.mpegurl"],
+                [DevicePlatform.iOS] = ["public.playlist"],
+            })
+        });
+
+        if (result is null)
+            return;
+
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(result.FullPath) && File.Exists(result.FullPath))
+            {
+                await LoadPlaylistAsync(result.FullPath, false, cancellationToken);
+            }
+            else
+            {
+                await using var stream = await result.OpenReadAsync();
+                using var reader = new StreamReader(stream);
+                await LoadPlaylistAsync(await reader.ReadToEndAsync(cancellationToken), true, cancellationToken);
+            }
+
+            if (tracks.Count > 0)
+                await PlayAsync(0, cancellationToken);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            SetError($"Playlist konnte nicht geöffnet werden: {ex.Message}");
+        }
+    }
+
+    public async Task LoadPlaylistAsync(string pathOrContent, bool isContent = false, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var content = isContent ? pathOrContent : await File.ReadAllTextAsync(pathOrContent, cancellationToken);
+            var baseDirectory = isContent ? null : Path.GetDirectoryName(pathOrContent);
+            tracks = PlaylistParser.Parse(content, baseDirectory).ToList();
+            currentIndex = -1;
+            ErrorMessage = tracks.Count == 0 ? "Die Playlist enthält keine abspielbaren Titel." : null;
+            RaiseStateChanged();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            tracks = [];
+            currentIndex = -1;
+            SetError($"Playlist konnte nicht gelesen werden: {ex.Message}");
+        }
+    }
+
+    public async Task PlayAsync(int index = 0, CancellationToken cancellationToken = default)
+    {
+        if (tracks.Count == 0)
+            return;
+        index = Math.Clamp(index, 0, tracks.Count - 1);
+        var resuming = index == currentIndex && audioPlayer is not null && IsPaused;
+        if (index != currentIndex)
+            await LoadTrackAsync(index, cancellationToken);
+
+        audioPlayer?.Play();
+        if (resuming)
+            await FadeToAsync(volume, cancellationToken);
+        IsPlaying = true;
+        IsPaused = false;
+        StartMonitor();
+        RaiseStateChanged();
+    }
+
+    public async Task PauseAsync(CancellationToken cancellationToken = default)
+    {
+        if (audioPlayer is null || !IsPlaying)
+            return;
+
+        CancelTransitionRequest();
+        await transitionLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (audioPlayer is null || !IsPlaying)
+                return;
+
+            await FadeToAsync(0, cancellationToken);
+            audioPlayer.Pause();
+            IsPlaying = false;
+            IsPaused = true;
+            RaiseStateChanged();
+        }
+        finally
+        {
+            transitionLock.Release();
+        }
+    }
+
+    public Task SeekAsync(double seconds, CancellationToken cancellationToken = default)
+    {
+        if (audioPlayer is null || Duration <= 0)
+            return Task.CompletedTask;
+
+        try
+        {
+            audioPlayer.Seek(Math.Clamp(seconds, 0, Duration));
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentOutOfRangeException)
+        {
+            SetError($"Die Abspielposition konnte nicht geändert werden: {ex.Message}");
+            return Task.CompletedTask;
+        }
+
+        RaiseStateChanged();
+        return Task.CompletedTask;
+    }
+
+    public Task NextAsync(CancellationToken cancellationToken = default) =>
+        tracks.Count == 0 ? Task.CompletedTask : TransitionByAsync(1, cancellationToken);
+
+    public Task PreviousAsync(CancellationToken cancellationToken = default) =>
+        tracks.Count == 0 ? Task.CompletedTask : TransitionByAsync(-1, cancellationToken);
+
+    public Task RestartAsync(CancellationToken cancellationToken = default) => SeekAsync(0, cancellationToken);
+
+    private async Task LoadTrackAsync(int index, CancellationToken cancellationToken)
+    {
+        monitorCancellation?.Cancel();
+        if (audioPlayer is not null)
+        {
+            audioPlayer.Stop();
+            audioPlayer.Dispose();
+        }
+
+        var source = tracks[index].Source;
+        if (!File.Exists(source))
+            throw new FileNotFoundException($"Audiodatei nicht gefunden: {source}", source);
+
+        var stream = File.OpenRead(source);
+        audioPlayer = audioManager.CreatePlayer(stream);
+        audioPlayer.Volume = 0;
+        currentIndex = index;
+        await FadeToAsync(volume, cancellationToken);
+        RaiseStateChanged();
+    }
+
+    private async Task TransitionByAsync(int offset, CancellationToken cancellationToken)
+    {
+        var transitionCancellation =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var previousRequest = Interlocked.Exchange(
+            ref transitionRequestCancellation,
+            transitionCancellation);
+        previousRequest?.Cancel();
+        var version = Interlocked.Increment(ref transitionVersion);
+
+        var lockTaken = false;
+        try
+        {
+            await transitionLock.WaitAsync(transitionCancellation.Token);
+            lockTaken = true;
+            transitionCancellation.Token.ThrowIfCancellationRequested();
+            var index = (currentIndex + offset + tracks.Count) % tracks.Count;
+
+            if (index == currentIndex && audioPlayer is not null)
+            {
+                await RestartAsync(transitionCancellation.Token);
+                return;
+            }
+
+            if (audioPlayer is null || !IsPlaying)
+            {
+                await LoadTrackAsync(index, transitionCancellation.Token);
+                audioPlayer?.Play();
+                IsPlaying = true;
+                IsPaused = false;
+                StartMonitor();
+                RaiseStateChanged();
+                return;
+            }
+
+            await CrossfadeToAsync(index, transitionCancellation.Token, version);
+        }
+        catch (OperationCanceledException) when (transitionCancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex) when (!isDisposed)
+        {
+            SetError($"Übergang konnte nicht ausgeführt werden: {ex.Message}");
+        }
+        finally
+        {
+            if (ReferenceEquals(transitionRequestCancellation, transitionCancellation))
+                Interlocked.CompareExchange(
+                    ref transitionRequestCancellation,
+                    null,
+                    transitionCancellation);
+            if (lockTaken)
+                transitionLock.Release();
+            transitionCancellation.Dispose();
+        }
+    }
+
+    private void StartMonitor()
+    {
+        if (monitorRunning)
+            return;
+
+        monitorCancellation?.Cancel();
+        monitorCancellation = new CancellationTokenSource();
+        monitorRunning = true;
+        _ = MonitorAsync(monitorCancellation.Token);
+    }
+
+    private async Task MonitorAsync(CancellationToken token)
+    {
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                if (audioPlayer is not null &&
+                    IsPlaying &&
+                    Duration > 0 &&
+                    Position >= Duration - Math.Max(.2, crossfadeSeconds))
+                {
+                    await TransitionByAsync(1, token);
+                }
+                RaiseStateChanged();
+                await Task.Delay(250, token);
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception) when (isDisposed)
+        {
+        }
+        catch (Exception ex)
+        {
+            SetError($"Playerüberwachung fehlgeschlagen: {ex.Message}");
+        }
+        finally
+        {
+            monitorRunning = false;
+        }
+    }
+
+    private async Task CrossfadeToAsync(int nextIndex, CancellationToken token, long version)
+    {
+        var oldPlayer = audioPlayer;
+        if (oldPlayer is null)
+        {
+            await LoadTrackAsync(nextIndex, token);
+            audioPlayer?.Play();
+            IsPlaying = true;
+            IsPaused = false;
+            return;
+        }
+
+        var next = audioManager.CreatePlayer(File.OpenRead(tracks[nextIndex].Source));
+        next.Volume = 0;
+        next.Play();
+        audioPlayer = next;
+        currentIndex = nextIndex;
+        IsPlaying = true;
+        IsPaused = false;
+        RaiseStateChanged();
+
+        try
+        {
+            var duration = Math.Max(.05, crossfadeSeconds);
+            for (var step = 0; step < 20; step++)
+            {
+                token.ThrowIfCancellationRequested();
+                if (version != Volatile.Read(ref transitionVersion))
+                    throw new OperationCanceledException(token);
+                var progress = (step + 1) / 20d;
+                var oldGain = 1 - Math.Pow(progress, 2);
+                var newGain = Math.Pow(progress, 2);
+                oldPlayer.Volume = volume * oldGain;
+                next.Volume = volume * newGain;
+                RaiseStateChanged();
+                await Task.Delay(TimeSpan.FromSeconds(duration / 20), token);
+            }
+
+            oldPlayer.Stop();
+            oldPlayer.Dispose();
+            next.Volume = volume;
+            RaiseStateChanged();
+        }
+        catch (OperationCanceledException)
+        {
+            try
+            {
+                oldPlayer.Stop();
+                oldPlayer.Dispose();
+            }
+            catch (Exception) when (isDisposed)
+            {
+            }
+
+            if (isDisposed)
+            {
+                try
+                {
+                    next.Stop();
+                    next.Dispose();
+                }
+                catch (Exception)
+                {
+                }
+                audioPlayer = null;
+                IsPlaying = false;
+                IsPaused = false;
+            }
+            else
+            {
+                next.Volume = volume;
+                RaiseStateChanged();
+            }
+
+            throw;
+        }
+    }
+
+    private async Task FadeToAsync(double target, CancellationToken token)
+    {
+        if (audioPlayer is null)
+            return;
+        var start = audioPlayer.Volume;
+        var duration = Math.Max(.05, crossfadeSeconds);
+        for (var step = 0; step < 20; step++)
+        {
+            audioPlayer.Volume = start + (target - start) * ((step + 1) / 20d);
+            await Task.Delay(TimeSpan.FromSeconds(duration / 20), token);
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        isDisposed = true;
+        CancelTransitionRequest();
+        monitorCancellation?.Cancel();
+        try
+        {
+            audioPlayer?.Stop();
+            audioPlayer?.Dispose();
+        }
+        catch (Exception)
+        {
+        }
+        monitorCancellation?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+
+    private void CancelTransitionRequest()
+    {
+        var request = transitionRequestCancellation;
+        if (request is null)
+            return;
+
+        try
+        {
+            request.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            Interlocked.CompareExchange(ref transitionRequestCancellation, null, request);
+        }
+    }
+
+    private void SetError(string message)
+    {
+        if (isDisposed)
+            return;
+
+        ErrorMessage = message;
+        RaiseStateChanged();
+    }
+
+    private void RaiseStateChanged()
+    {
+        if (isDisposed)
+            return;
+
+        try
+        {
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+        catch (ObjectDisposedException) when (isDisposed)
+        {
+        }
+    }
+}
