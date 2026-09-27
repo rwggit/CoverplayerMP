@@ -51,12 +51,17 @@
             <div class="control-toolbar">
                 <div class="control-buttons">
                 <button @onclick="OpenPlaylistAsync">Playlist öffnen</button>
-                <button @onclick="PreviousAsync" disabled="@(Player.Tracks.Count == 0)">Vorheriges</button>
-                <button @onclick="RestartAsync" disabled="@(Player.CurrentTrack is null)">Anfang</button>
-                <button class="play-button" @onclick="TogglePauseAsync" disabled="@(Player.CurrentTrack is null)">
-                    @(Player.IsPlaying ? "Pause" : "Wiedergabe")
+                <button @onclick="PreviousAsync" disabled="@(Player.Tracks.Count == 0)"
+                        title="Vorheriges" aria-label="Vorheriges">&#x23EE;&#xFE0E;</button>
+                <button @onclick="RestartAsync" disabled="@(Player.CurrentTrack is null)"
+                        title="Anfang" aria-label="Anfang">&#x21BA;&#xFE0E;</button>
+                <button class="play-button" @onclick="TogglePauseAsync" disabled="@(Player.CurrentTrack is null)"
+                        title="@(Player.IsPlaying ? "Pause" : "Wiedergabe")"
+                        aria-label="@(Player.IsPlaying ? "Pause" : "Wiedergabe")">
+                    @(Player.IsPlaying ? "\u23F8\uFE0E" : "\u25B6\uFE0E")
                 </button>
-                <button @onclick="NextAsync" disabled="@(Player.Tracks.Count == 0)">Nächstes</button>
+                <button @onclick="NextAsync" disabled="@(Player.Tracks.Count == 0)"
+                        title="Nächstes" aria-label="Nächstes">&#x23ED;&#xFE0E;</button>
                 </div>
                 <label class="setting-row setting-inline">
                     <span class="setting-icon"

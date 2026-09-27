@@ -20,6 +20,12 @@ public class MainActivity : MauiAppCompatActivity
         _ = HandleSharedPlaylistAsync(Intent);
     }
 
+    protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+    {
+        base.OnActivityResult(requestCode, resultCode, data);
+        CoverPlayerMP.Platforms.Android.PlaylistDocumentPicker.OnActivityResult(requestCode, resultCode, data);
+    }
+
     protected override void OnNewIntent(Intent? intent)
     {
         base.OnNewIntent(intent);

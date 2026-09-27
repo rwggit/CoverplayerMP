@@ -1,4 +1,4 @@
-using Plugin.Maui.Audio;
+﻿using Plugin.Maui.Audio;
 using CoverPlayerMP.Shared.Player;
 
 namespace CoverPlayerMP.Player;
@@ -49,13 +49,41 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
 
     public async Task OpenPlaylistAsync(CancellationToken cancellationToken = default)
     {
+#if ANDROID
+        if (await Permissions.RequestAsync<CoverPlayerMP.Platforms.Android.ReadMediaAudioPermission>() != PermissionStatus.Granted)
+        {
+            SetError("Ohne Berechtigung für Audiodateien können die Titel nicht gelesen werden.");
+            return;
+        }
+
+        try
+        {
+            var uri = await CoverPlayerMP.Platforms.Android.PlaylistDocumentPicker.PickAsync();
+            if (uri is null)
+                return;
+
+            var path = CoverPlayerMP.Platforms.Android.PlaylistDocumentPicker.GetPhysicalPath(Platform.AppContext, uri);
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
+            {
+                SetError($"Der Speicherort der Playlist konnte nicht ermittelt werden: {uri}");
+                return;
+            }
+
+            await LoadPlaylistAsync(path, false, cancellationToken);
+            if (tracks.Count > 0)
+                await PlayAsync(0, cancellationToken);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            SetError($"Playlist konnte nicht geöffnet werden: {ex.Message}");
+        }
+#else
         var result = await FilePicker.Default.PickAsync(new PickOptions
         {
             PickerTitle = "M3U-Playlist auswählen",
             FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
             {
                 [DevicePlatform.WinUI] = [".m3u", ".m3u8"],
-                [DevicePlatform.Android] = ["audio/x-mpegurl", "application/vnd.apple.mpegurl"],
                 [DevicePlatform.iOS] = ["public.playlist"],
             })
         });
@@ -83,6 +111,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
         {
             SetError($"Playlist konnte nicht geöffnet werden: {ex.Message}");
         }
+#endif
     }
 
     public async Task LoadPlaylistAsync(string pathOrContent, bool isContent = false, CancellationToken cancellationToken = default)
@@ -186,13 +215,22 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
         if (!File.Exists(source))
             throw new FileNotFoundException($"Audiodatei nicht gefunden: {source}", source);
 
-        var stream = File.OpenRead(source);
-        audioPlayer = audioManager.CreatePlayer(stream);
+        audioPlayer = await CreatePlayerAsync(source, cancellationToken);
         audioPlayer.Volume = 0;
         currentIndex = index;
         await FadeToAsync(volume, cancellationToken);
         RaiseStateChanged();
     }
+
+    private Task<IAudioPlayer> CreatePlayerAsync(string source, CancellationToken cancellationToken) =>
+        Task.Run(() =>
+        {
+#if ANDROID
+            return (IAudioPlayer)new CoverPlayerMP.Platforms.Android.AndroidFilePlayer(source);
+#else
+            return audioManager.CreatePlayer(File.OpenRead(source));
+#endif
+        }, cancellationToken);
 
     private async Task TransitionByAsync(int offset, CancellationToken cancellationToken)
     {
@@ -305,7 +343,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
             return;
         }
 
-        var next = audioManager.CreatePlayer(File.OpenRead(tracks[nextIndex].Source));
+        var next = await CreatePlayerAsync(tracks[nextIndex].Source, token);
         next.Volume = 0;
         next.Play();
         audioPlayer = next;
@@ -331,9 +369,18 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
                 await Task.Delay(TimeSpan.FromSeconds(duration / 20), token);
             }
 
-            oldPlayer.Stop();
-            oldPlayer.Dispose();
             next.Volume = volume;
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    oldPlayer.Stop();
+                    oldPlayer.Dispose();
+                }
+                catch (Exception)
+                {
+                }
+            });
             RaiseStateChanged();
         }
         catch (OperationCanceledException)

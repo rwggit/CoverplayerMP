@@ -1,0 +1,12 @@
+Erstelle eine neue Visual Studio Solution CoverPlayerMP im neuen Verzeichnis CoverPlayerMP.
+Diese Solution soll MAUI verwenden um eine App zu erstellen, die unter Windows, Android, IOS und im Web läuft.
+Diese App soll m3u-Playlisten abspielen über Plugin.Maui.Audio. Die abzuspielende Playlist soll über das Dateisystem auswählbar sein, bzw. über die Teilen-Funktion an die App übergeben werden.
+Das Hauptfenster soll das Cover aus der gerade abgespielten Audiodatei möglichst groß angezeigen, ohne es zu verzerren. Hierzu soll SkiaSharp verwendet werden. Ganz unten sollen in einer Textzeile Interpret und Liedtitel angezeigt werden.
+Am Ende eine Lieds, soll dies langsam ausgeblendet werden (leise werden) und das nächste Lied während der Ausblendung des vorigen Lieds langsam eingeblendet werden (lauter werden).
+Die Steuerung des Players soll durch einen eigenen Dialog erfolgen, der durch Tippen auf das Hauptfenster, bzw. Positionierung der Maus an den unteren Rand des Haupfensters, am unteren Rand angezeigt wird.
+In der oberen rechten Ecke des Dialogs muss es eine Schaltfläche geben, die den Steuerdialog wieder ausblendet.
+Dieser Steuerdialog soll die aktuelle Abspielposition im aktuellen Lied über einen waagerechtenSchieberegler angezeigen und einstellbar machen.
+Die Dauer der oben erwähnten Aus- und Einblendung der Lieder soll im Steuerdialog über einen Schieberegler zwischen 0 und 5 Sekunden einstellbar sein.
+Der Steuerdialog muss eine Schaltfläche enthalten, um zurück zum Liedanfang zu springen, eine Schaltfläche um zum nächsten Lied zu springen, und eine Schaltfläche, um zum vorigen Lied zu springen.
+Ebenso muss der Steuerdialog eine Schaltfläche für Pause enthalten. Bei Drücken von Pause soll das Lied ausgeblendet werden mit der über den Schieberegler eingestellten Übergangszeit und dann soll die Wiedergabe pausiert werden. Wird die Pause-Taste nochmals gedrückt sollt das Lied an der aktuellen Position wieder eingeblendet werden.
+Es muss auch einen Schieberegler für die Einstellung der Lautstärke geben.
