@@ -58,6 +58,15 @@
                                                 <path d="M5.6 11a1 1 0 0 1 .9-.7h15.2a.8.8 0 0 1 .8 1l-2.1 7a1 1 0 0 1-1 .7H3.8a.8.8 0 0 1-.8-1z" />
                                             </svg>
                                         </button>
+                <button @onclick="OpenLibraryAsync"
+                        title="Audiodateien suchen" aria-label="Audiodateien suchen">
+                    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor"
+                         stroke-width="2.5" stroke-linecap="round"
+                         aria-hidden="true" focusable="false" style="vertical-align: -0.125em;">
+                        <circle cx="10" cy="10" r="6.5" />
+                        <path d="M15 15l6 6" />
+                    </svg>
+                </button>
                 <button @onclick="PreviousAsync" disabled="@(Player.Tracks.Count == 0)"
                         title="Vorheriges" aria-label="Vorheriges">
                                             <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor"
@@ -120,6 +129,66 @@
             </div>
         </section>
     }
+
+    @if (libraryVisible)
+    {
+        <section class="library-dialog" @onclick:stopPropagation="true">
+            <div class="control-dialog-header">
+                <span>Audiodateien (@FilteredLibrary.Count() von @libraryTracks.Count)</span>
+                <button class="close-button" title="Schließen" @onclick="CloseLibrary">×</button>
+            </div>
+            @if (libraryLoading)
+            {
+                <div class="library-status">Audiodateien werden gelesen …</div>
+            }
+            else
+            {
+                <div class="library-table-wrapper">
+                    <table class="library-table">
+                        <thead>
+                            <tr>
+                                <th><input placeholder="Interpret" @bind="artistFilter" @bind:event="oninput" /></th>
+                                <th><input placeholder="Titel" @bind="titleFilter" @bind:event="oninput" /></th>
+                                <th><input placeholder="z.B. >3:00" @bind="durationFilter" @bind:event="oninput" /></th>
+                            </tr>
+                            <tr>
+                                <th class="sortable" @onclick="() => SortBy(LibrarySortColumn.Artist)">Interpret@(SortIndicator(LibrarySortColumn.Artist))</th>
+                                <th class="sortable" @onclick="() => SortBy(LibrarySortColumn.Title)">Titel@(SortIndicator(LibrarySortColumn.Title))</th>
+                                <th class="sortable" @onclick="() => SortBy(LibrarySortColumn.Duration)">Dauer@(SortIndicator(LibrarySortColumn.Duration))</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in FilteredLibrary)
+                            {
+                                <tr @onclick="() => SelectLibraryTrackAsync(item)">
+                                    <td>@item.Track.Artist</td>
+                                    <td>@item.Track.Title</td>
+                                    <td>@FormatTime(item.Duration.TotalSeconds)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    }
+
+    @if (pendingTrack is not null)
+    {
+        <div class="insert-overlay" @onclick:stopPropagation="true">
+            <section class="insert-dialog">
+                <div class="control-dialog-header">
+                    <span>„@pendingTrack.Title“ einfügen</span>
+                    <button class="close-button" title="Abbrechen" @onclick="() => pendingTrack = null">×</button>
+                </div>
+                <button @onclick="() => InsertPendingAsync(TrackInsertPosition.Start)">Am Anfang der Playlist</button>
+                <button @onclick="() => InsertPendingAsync(TrackInsertPosition.BeforeCurrent)">Vor dem aktuellen Lied</button>
+                <button @onclick="() => InsertPendingAsync(TrackInsertPosition.AfterCurrent)">Hinter dem aktuellen Lied</button>
+                <button @onclick="() => InsertPendingAsync(TrackInsertPosition.AfterCurrentAndPlay)">Hinter dem aktuellen Lied und sofort abspielen</button>
+                <button @onclick="() => InsertPendingAsync(TrackInsertPosition.End)">Am Ende der Playlist</button>
+            </section>
+        </div>
+    }
 </div>
 
 @code {
@@ -132,7 +201,27 @@
     private bool disposed;
     private DotNetObjectReference<Home>? keyboardReference;
 
-    protected override void OnInitialized() => Player.StateChanged += OnPlayerStateChanged;
+    protected override void OnInitialized()
+    {
+        Player.StateChanged += OnPlayerStateChanged;
+        BackNavigation.Handler = HandleBack;
+    }
+
+    private bool HandleBack()
+    {
+        if (pendingTrack is null && !libraryVisible)
+            return false;
+
+        _ = InvokeAsync(() =>
+        {
+            if (pendingTrack is not null)
+                pendingTrack = null;
+            else
+                libraryVisible = false;
+            StateHasChanged();
+        });
+        return true;
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -184,6 +273,146 @@
     }
 
     private Task OpenPlaylistAsync() => Player.OpenPlaylistAsync();
+
+    private bool libraryVisible;
+    private bool libraryLoading;
+    private IReadOnlyList<LibraryTrack> libraryTracks = [];
+    private string artistFilter = string.Empty;
+    private string titleFilter = string.Empty;
+    private string durationFilter = string.Empty;
+    private Track? pendingTrack;
+
+    private async Task OpenLibraryAsync()
+    {
+        libraryVisible = true;
+        libraryLoading = true;
+        StateHasChanged();
+        try
+        {
+            libraryTracks = (await Player.GetLibraryTracksAsync())
+                .OrderBy(t => t.Track.Artist, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(t => t.Track.Title, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+        }
+        finally
+        {
+            libraryLoading = false;
+        }
+    }
+
+    private void CloseLibrary()
+    {
+        libraryVisible = false;
+        pendingTrack = null;
+    }
+
+    private enum LibrarySortColumn { Artist, Title, Duration }
+
+    private LibrarySortColumn sortColumn = LibrarySortColumn.Artist;
+    private bool sortDescending;
+
+    private void SortBy(LibrarySortColumn column)
+    {
+        if (sortColumn == column)
+        {
+            sortDescending = !sortDescending;
+        }
+        else
+        {
+            sortColumn = column;
+            sortDescending = false;
+        }
+    }
+
+    private string SortIndicator(LibrarySortColumn column) =>
+        sortColumn != column ? string.Empty : sortDescending ? " ▼" : " ▲";
+
+    private IEnumerable<LibraryTrack> FilteredLibrary => Sort(libraryTracks.Where(t =>
+        t.Track.Artist.Contains(artistFilter.Trim(), StringComparison.CurrentCultureIgnoreCase) &&
+        t.Track.Title.Contains(titleFilter.Trim(), StringComparison.CurrentCultureIgnoreCase) &&
+        MatchesDuration(t.Duration)));
+
+    private IEnumerable<LibraryTrack> Sort(IEnumerable<LibraryTrack> items)
+    {
+        var comparer = StringComparer.CurrentCultureIgnoreCase;
+        IOrderedEnumerable<LibraryTrack> ordered = sortColumn switch
+        {
+            LibrarySortColumn.Title => sortDescending
+                ? items.OrderByDescending(t => t.Track.Title, comparer)
+                : items.OrderBy(t => t.Track.Title, comparer),
+            LibrarySortColumn.Duration => sortDescending
+                ? items.OrderByDescending(t => t.Duration)
+                : items.OrderBy(t => t.Duration),
+            _ => sortDescending
+                ? items.OrderByDescending(t => t.Track.Artist, comparer)
+                : items.OrderBy(t => t.Track.Artist, comparer)
+        };
+
+        return sortColumn == LibrarySortColumn.Artist
+            ? ordered.ThenBy(t => t.Track.Title, comparer)
+            : ordered.ThenBy(t => t.Track.Artist, comparer);
+    }
+
+    private bool MatchesDuration(TimeSpan duration)
+    {
+        var filter = durationFilter.Trim();
+        if (filter.Length == 0)
+            return true;
+
+        var op = filter[0];
+        if (op is '<' or '>')
+        {
+            var value = filter[1..].Trim();
+            if (value.Length == 0)
+                return true;
+            if (!TryParseDuration(value, out var limit))
+                return false;
+            return op == '>' ? duration > limit : duration < limit;
+        }
+
+        return FormatTime(duration.TotalSeconds).Contains(filter, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryParseDuration(string value, out TimeSpan result)
+    {
+        result = TimeSpan.Zero;
+        var parts = value.Split(':');
+        if (parts.Length > 3)
+            return false;
+
+        var seconds = 0d;
+        foreach (var part in parts)
+        {
+            if (!double.TryParse(part.Replace(',', '.'),
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var number))
+                return false;
+            seconds = seconds * 60 + number;
+        }
+
+        result = TimeSpan.FromSeconds(seconds);
+        return true;
+    }
+
+    private async Task SelectLibraryTrackAsync(LibraryTrack item)
+    {
+        if (Player.Tracks.Count == 0)
+        {
+            await Player.InsertTrackAsync(item.Track, TrackInsertPosition.End);
+            return;
+        }
+
+        pendingTrack = item.Track;
+    }
+
+    private async Task InsertPendingAsync(TrackInsertPosition position)
+    {
+        var track = pendingTrack;
+        pendingTrack = null;
+        if (track is not null)
+            await Player.InsertTrackAsync(track, position);
+    }
     private Task PreviousAsync() => Player.PreviousAsync();
     private Task NextAsync() => Player.NextAsync();
     private Task RestartAsync() => Player.RestartAsync();
@@ -242,6 +471,7 @@
     {
         disposed = true;
         Player.StateChanged -= OnPlayerStateChanged;
+        BackNavigation.Handler = null;
         if (keyboardReference is not null)
         {
             try

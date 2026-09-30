@@ -176,3 +176,67 @@ button {
 button:hover { background: #46506d; }
 button:disabled { cursor: not-allowed; opacity: .45; }
 .play-button { background: #5b4acb; }
+
+.library-dialog {
+    position: absolute;
+    inset: calc(1rem + env(safe-area-inset-top, 0px)) 1rem 4.25rem;
+    top: max(calc(1rem + env(safe-area-inset-top, 0px)), 2.5rem);
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    padding: .75rem 1.25rem 1rem;
+    border: 1px solid #51576d;
+    border-radius: 1rem;
+    background: rgb(24 27 37 / 97%);
+    box-shadow: 0 1rem 3rem rgb(0 0 0 / 45%);
+    user-select: text;
+}
+.library-status { padding: 1rem; color: #c9cde0; }
+.library-table-wrapper { flex: 1; min-height: 0; overflow: auto; }
+.library-table { width: 100%; border-collapse: collapse; }
+.library-table th, .library-table td {
+    padding: .35rem .5rem;
+    border-bottom: 1px solid #373c50;
+    text-align: left;
+}
+.library-table th { position: sticky; background: #1d2130; color: #c9cde0; }
+.library-table thead tr:first-child th { top: 0; }
+.library-table thead tr:nth-child(2) th { top: 2.6rem; }
+.library-table th input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: .35rem .5rem;
+    border: 1px solid #5c637b;
+    border-radius: .4rem;
+    background: #10131b;
+    color: #fff;
+}
+.library-table td:last-child, .library-table th:last-child { width: 5.5rem; font-variant-numeric: tabular-nums; }
+@media (max-width: 600px) {
+    .library-dialog { right: .5rem; left: .5rem; padding: .5rem .5rem .75rem; }
+    .library-table th, .library-table td { padding: .3rem .25rem; font-size: .85rem; }
+    .library-table td:last-child, .library-table th:last-child { width: 4.5rem; }
+}
+.library-table tbody tr { cursor: pointer; }
+.library-table th.sortable { cursor: pointer; user-select: none; }
+.library-table th.sortable:hover { color: #fff; background: #30364a; }
+.library-table tbody tr:hover { background: #30364a; }
+
+.insert-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: grid;
+    place-items: center;
+    background: rgb(0 0 0 / 55%);
+}
+.insert-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    min-width: 18rem;
+    padding: .75rem 1.25rem 1.25rem;
+    border: 1px solid #51576d;
+    border-radius: 1rem;
+    background: #181b25;
+}

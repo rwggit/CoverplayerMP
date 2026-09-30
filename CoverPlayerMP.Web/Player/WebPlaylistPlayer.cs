@@ -89,6 +89,46 @@ public sealed class WebPlaylistPlayer(IJSRuntime js) : IPlaylistPlayer
 
     public Task RestartAsync(CancellationToken cancellationToken = default) => SeekAsync(0, cancellationToken);
 
+    public async Task<IReadOnlyList<LibraryTrack>> GetLibraryTracksAsync(CancellationToken cancellationToken = default)
+    {
+        var files = await js.InvokeAsync<LibraryFile[]?>("coverPlayer.pickAudioLibrary", cancellationToken);
+        return files?.Select(f => new LibraryTrack(
+                new Track(f.Source, f.Title, f.Artist),
+                TimeSpan.FromSeconds(f.Duration)))
+            .ToList() ?? [];
+    }
+
+    public async Task InsertTrackAsync(Track track, TrackInsertPosition position, CancellationToken cancellationToken = default)
+    {
+        if (tracks.Count == 0)
+        {
+            tracks = [track];
+            currentIndex = -1;
+            await PlayAsync(0, cancellationToken);
+            return;
+        }
+
+        var current = Math.Max(currentIndex, 0);
+        var index = position switch
+        {
+            TrackInsertPosition.Start => 0,
+            TrackInsertPosition.BeforeCurrent => current,
+            TrackInsertPosition.AfterCurrent or TrackInsertPosition.AfterCurrentAndPlay => currentIndex < 0 ? 0 : current + 1,
+            _ => tracks.Count
+        };
+
+        tracks.Insert(index, track);
+        if (currentIndex >= 0 && index <= currentIndex)
+            currentIndex++;
+
+        if (position == TrackInsertPosition.AfterCurrentAndPlay)
+            await PlayAsync(index, cancellationToken);
+        else
+            StateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private sealed record LibraryFile(string Source, string Title, string Artist, double Duration);
+
     private async Task UpdateStateAsync(CancellationToken cancellationToken)
     {
         var state = await js.InvokeAsync<AudioState>("coverPlayer.state", cancellationToken);

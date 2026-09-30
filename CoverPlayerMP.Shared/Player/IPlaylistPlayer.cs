@@ -23,4 +23,6 @@ public interface IPlaylistPlayer : IAsyncDisposable
     Task NextAsync(CancellationToken cancellationToken = default);
     Task PreviousAsync(CancellationToken cancellationToken = default);
     Task RestartAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<LibraryTrack>> GetLibraryTracksAsync(CancellationToken cancellationToken = default);
+    Task InsertTrackAsync(Track track, TrackInsertPosition position, CancellationToken cancellationToken = default);
 }

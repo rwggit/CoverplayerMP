@@ -205,6 +205,111 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
 
     public Task RestartAsync(CancellationToken cancellationToken = default) => SeekAsync(0, cancellationToken);
 
+    public async Task<IReadOnlyList<LibraryTrack>> GetLibraryTracksAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+#if ANDROID
+            if (await Permissions.RequestAsync<CoverPlayerMP.Platforms.Android.ReadMediaAudioPermission>() != PermissionStatus.Granted)
+            {
+                SetError("Ohne Berechtigung für Audiodateien können die Titel nicht gelesen werden.");
+                return [];
+            }
+
+            return await Task.Run(CoverPlayerMP.Platforms.Android.AudioLibrary.Query, cancellationToken);
+#else
+            return await Task.Run(() => ScanMusicFolderAsync(cancellationToken), cancellationToken);
+#endif
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            SetError($"Audiodateien konnten nicht gelesen werden: {ex.Message}");
+            return [];
+        }
+    }
+
+#if !ANDROID
+    private static readonly string[] AudioExtensions = [".mp3", ".wav", ".m4a", ".flac", ".aac", ".ogg", ".opus", ".wma"];
+
+    private static async Task<IReadOnlyList<LibraryTrack>> ScanMusicFolderAsync(CancellationToken cancellationToken)
+    {
+        var result = new List<LibraryTrack>();
+        var root = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
+        if (string.IsNullOrEmpty(root) || !Directory.Exists(root))
+            return result;
+
+        var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true };
+        foreach (var file in Directory.EnumerateFiles(root, "*", options))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!AudioExtensions.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
+                continue;
+
+            var name = Path.GetFileNameWithoutExtension(file);
+            var separator = name.IndexOf(" - ", StringComparison.Ordinal);
+            var artist = separator > 0 ? name[..separator].Trim() : "Unbekannter Interpret";
+            var title = separator > 0 ? name[(separator + 3)..].Trim() : name;
+            var duration = TimeSpan.Zero;
+#if WINDOWS
+            try
+            {
+                var storageFile = await Windows.Storage.StorageFile.GetFileFromPathAsync(file);
+                var properties = await storageFile.Properties.GetMusicPropertiesAsync();
+                if (!string.IsNullOrWhiteSpace(properties.Artist))
+                    artist = properties.Artist;
+                if (!string.IsNullOrWhiteSpace(properties.Title))
+                    title = properties.Title;
+                duration = properties.Duration;
+            }
+            catch (Exception)
+            {
+            }
+#else
+            await Task.CompletedTask;
+#endif
+            result.Add(new LibraryTrack(new Track(file, title, artist, file), duration));
+        }
+
+        return result;
+    }
+#endif
+
+    public async Task InsertTrackAsync(Track track, TrackInsertPosition position, CancellationToken cancellationToken = default)
+    {
+        if (tracks.Count == 0)
+        {
+            tracks = [track];
+            currentIndex = -1;
+            failedTransitionIndex = null;
+            ErrorMessage = null;
+            await PlayAsync(0, cancellationToken);
+            return;
+        }
+
+        var current = Math.Max(currentIndex, 0);
+        var index = position switch
+        {
+            TrackInsertPosition.Start => 0,
+            TrackInsertPosition.BeforeCurrent => current,
+            TrackInsertPosition.AfterCurrent or TrackInsertPosition.AfterCurrentAndPlay => currentIndex < 0 ? 0 : current + 1,
+            _ => tracks.Count
+        };
+
+        tracks.Insert(index, track);
+        if (currentIndex >= 0 && index <= currentIndex)
+            currentIndex++;
+        failedTransitionIndex = null;
+        RaiseStateChanged();
+
+        if (position == TrackInsertPosition.AfterCurrentAndPlay)
+        {
+            if (currentIndex < 0 || audioPlayer is null || !IsPlaying)
+                await PlayAsync(index, cancellationToken);
+            else
+                await NextAsync(cancellationToken);
+        }
+    }
+
     private async Task LoadTrackAsync(int index, CancellationToken cancellationToken)
     {
         var source = tracks[index].Source;
