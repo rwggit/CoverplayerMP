@@ -54,6 +54,7 @@
 }
 
 .cover-placeholder {
+    position: absolute;
     font-size: 12rem;
     color: #555a6e;
 }
