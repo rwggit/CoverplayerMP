@@ -15,6 +15,9 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
     private bool isDisposed;
     private List<Track> tracks = [];
     private string? playlistPath;
+#if ANDROID
+    private Android.Net.Uri? playlistUri;
+#endif
     public bool IsPlaylistModified { get; private set; }
     public bool CanQuit => true;
     private int currentIndex = -1;
@@ -75,6 +78,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
             }
 
             await LoadPlaylistAsync(path, false, cancellationToken);
+            playlistUri = uri;
             if (tracks.Count > 0)
                 await PlayAsync(0, cancellationToken);
         }
@@ -127,6 +131,9 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
             var baseDirectory = isContent ? null : Path.GetDirectoryName(pathOrContent);
             tracks = PlaylistParser.Parse(content, baseDirectory).ToList();
             playlistPath = isContent ? null : pathOrContent;
+#if ANDROID
+            playlistUri = null;
+#endif
             IsPlaylistModified = false;
             currentIndex = -1;
             failedTransitionIndex = null;
@@ -285,6 +292,9 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
         {
             tracks = [track];
             playlistPath = null;
+#if ANDROID
+            playlistUri = null;
+#endif
             IsPlaylistModified = true;
             currentIndex = -1;
             failedTransitionIndex = null;
@@ -322,32 +332,86 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
     {
         try
         {
-            var target = playlistPath;
-            if (string.IsNullOrEmpty(target) || target.StartsWith(FileSystem.CacheDirectory, StringComparison.OrdinalIgnoreCase))
-            {
-#if ANDROID
-                var folder = Android.OS.Environment.GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryMusic)?.AbsolutePath
-                             ?? FileSystem.AppDataDirectory;
-#else
-                var folder = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
-                if (string.IsNullOrEmpty(folder))
-                    folder = FileSystem.AppDataDirectory;
-#endif
-                target = Path.Combine(folder, $"CoverPlayer-{DateTime.Now:yyyyMMdd-HHmmss}.m3u");
-            }
+            var suggestedName = string.IsNullOrEmpty(playlistPath)
+                ? $"CoverPlayer-{DateTime.Now:yyyyMMdd-HHmmss}.m3u"
+                : Path.GetFileName(playlistPath);
 
-            await File.WriteAllTextAsync(target, PlaylistParser.Write(tracks), PlaylistParser.GetEncoding(target), cancellationToken);
+#if ANDROID
+            var uri = await CoverPlayerMP.Platforms.Android.PlaylistDocumentPicker.PickSaveLocationAsync(suggestedName, playlistUri);
+            if (uri is null)
+                return null;
+
+            var target = CoverPlayerMP.Platforms.Android.PlaylistDocumentPicker.GetPhysicalPath(Platform.AppContext, uri);
+            var fileName = target ?? CoverPlayerMP.Platforms.Android.PlaylistDocumentPicker.GetDisplayName(Platform.AppContext, uri) ?? suggestedName;
+            await CoverPlayerMP.Platforms.Android.PlaylistDocumentPicker.WriteAsync(
+                Platform.AppContext, uri, PlaylistParser.WriteBytes(tracks, fileName, Path.GetDirectoryName(target)), cancellationToken);
+            playlistUri = uri;
+            target ??= fileName;
+#elif WINDOWS
+            var target = await PickWindowsSaveLocationAsync(suggestedName);
+            if (target is null)
+                return null;
+
+            await File.WriteAllTextAsync(target, PlaylistParser.Write(tracks, Path.GetDirectoryName(target)), PlaylistParser.GetEncoding(target), cancellationToken);
+#else
+            var folder = string.IsNullOrEmpty(playlistPath) || playlistPath.StartsWith(FileSystem.CacheDirectory, StringComparison.OrdinalIgnoreCase)
+                ? FileSystem.AppDataDirectory
+                : Path.GetDirectoryName(playlistPath)!;
+            var target = Path.Combine(folder, suggestedName);
+            await File.WriteAllTextAsync(target, PlaylistParser.Write(tracks, folder), PlaylistParser.GetEncoding(target), cancellationToken);
+#endif
             playlistPath = target;
             IsPlaylistModified = false;
             RaiseStateChanged();
             return target;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             SetError($"Playlist konnte nicht gespeichert werden: {ex.Message}");
             return null;
         }
     }
+
+#if WINDOWS
+    private async Task<string?> PickWindowsSaveLocationAsync(string suggestedName)
+    {
+        var picker = new Windows.Storage.Pickers.FileSavePicker
+        {
+            SuggestedFileName = Path.GetFileNameWithoutExtension(suggestedName),
+            SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.MusicLibrary
+        };
+        var extension = Path.GetExtension(suggestedName);
+        if (string.Equals(extension, ".m3u8", StringComparison.OrdinalIgnoreCase))
+        {
+            picker.FileTypeChoices.Add("M3U8-Playlist (UTF-8)", [".m3u8"]);
+            picker.FileTypeChoices.Add("M3U-Playlist", [".m3u"]);
+        }
+        else
+        {
+            picker.FileTypeChoices.Add("M3U-Playlist", [".m3u"]);
+            picker.FileTypeChoices.Add("M3U8-Playlist (UTF-8)", [".m3u8"]);
+        }
+
+        if (!string.IsNullOrEmpty(playlistPath) && File.Exists(playlistPath) &&
+            !playlistPath.StartsWith(FileSystem.CacheDirectory, StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                picker.SuggestedSaveFile = await Windows.Storage.StorageFile.GetFileFromPathAsync(playlistPath);
+            }
+            catch (Exception)
+            {
+            }
+        }
+
+        var window = Application.Current?.Windows.FirstOrDefault()?.Handler?.PlatformView as Microsoft.UI.Xaml.Window
+            ?? throw new InvalidOperationException("Kein aktives Fenster.");
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(window));
+
+        var file = await picker.PickSaveFileAsync();
+        return file?.Path;
+    }
+#endif
 
     public void Quit() => Application.Current?.Quit();
 

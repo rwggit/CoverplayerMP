@@ -10,7 +10,27 @@ namespace CoverPlayerMP.Platforms.Android;
 public static class PlaylistDocumentPicker
 {
     public const int RequestCode = 4711;
+    public const int SaveRequestCode = 4712;
     private static TaskCompletionSource<AndroidUri?>? pending;
+    private static TaskCompletionSource<AndroidUri?>? pendingSave;
+
+    public static Task<AndroidUri?> PickSaveLocationAsync(string suggestedName, AndroidUri? initialLocation)
+    {
+        var activity = Platform.CurrentActivity
+            ?? throw new InvalidOperationException("Keine aktive Android-Activity.");
+
+        pendingSave?.TrySetResult(null);
+        pendingSave = new TaskCompletionSource<AndroidUri?>();
+
+        var intent = new Intent(Intent.ActionCreateDocument);
+        intent.AddCategory(Intent.CategoryOpenable);
+        intent.SetType("audio/x-mpegurl");
+        intent.PutExtra(Intent.ExtraTitle, suggestedName);
+        if (initialLocation is not null && OperatingSystem.IsAndroidVersionAtLeast(26))
+            intent.PutExtra(DocumentsContract.ExtraInitialUri, initialLocation);
+        activity.StartActivityForResult(intent, SaveRequestCode);
+        return pendingSave.Task;
+    }
 
     public static Task<AndroidUri?> PickAsync()
     {
@@ -22,6 +42,7 @@ public static class PlaylistDocumentPicker
 
         var intent = new Intent(Intent.ActionOpenDocument);
         intent.AddCategory(Intent.CategoryOpenable);
+        intent.AddFlags(ActivityFlags.GrantReadUriPermission | ActivityFlags.GrantWriteUriPermission | ActivityFlags.GrantPersistableUriPermission);
         intent.SetType("*/*");
         intent.PutExtra(Intent.ExtraMimeTypes, new[] { "audio/x-mpegurl", "audio/mpegurl", "application/vnd.apple.mpegurl", "application/x-mpegurl", "application/octet-stream" });
         activity.StartActivityForResult(intent, RequestCode);
@@ -30,10 +51,56 @@ public static class PlaylistDocumentPicker
 
     public static void OnActivityResult(int requestCode, Result resultCode, Intent? data)
     {
+        if (requestCode == SaveRequestCode)
+        {
+            pendingSave?.TrySetResult(resultCode == Result.Ok ? data?.Data : null);
+            pendingSave = null;
+            return;
+        }
+
         if (requestCode != RequestCode)
             return;
-        pending?.TrySetResult(resultCode == Result.Ok ? data?.Data : null);
+        var uri = resultCode == Result.Ok ? data?.Data : null;
+        if (uri is not null)
+        {
+            try
+            {
+                global::Android.App.Application.Context.ContentResolver?.TakePersistableUriPermission(
+                    uri, ActivityFlags.GrantReadUriPermission | ActivityFlags.GrantWriteUriPermission);
+            }
+            catch (Java.Lang.SecurityException)
+            {
+            }
+        }
+
+        pending?.TrySetResult(uri);
         pending = null;
+    }
+
+    public static async Task WriteAsync(Context context, AndroidUri uri, byte[] content, CancellationToken cancellationToken)
+    {
+        await using var output = context.ContentResolver?.OpenOutputStream(uri, "wt")
+            ?? throw new IOException($"Playlist kann nicht zum Schreiben geöffnet werden: {uri}");
+        await output.WriteAsync(content, cancellationToken);
+    }
+
+    public static string? GetDisplayName(Context context, AndroidUri uri)
+    {
+        try
+        {
+            using ICursor? cursor = context.ContentResolver?.Query(uri, [IOpenableColumns.DisplayName], null, null, null);
+            if (cursor is not null && cursor.MoveToFirst())
+            {
+                var name = GetString(cursor, IOpenableColumns.DisplayName);
+                if (!string.IsNullOrEmpty(name))
+                    return name;
+            }
+        }
+        catch (Java.Lang.Exception)
+        {
+        }
+
+        return uri.LastPathSegment;
     }
 
     public static string? GetPhysicalPath(Context context, AndroidUri uri)

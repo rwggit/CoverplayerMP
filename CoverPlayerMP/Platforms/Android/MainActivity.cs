@@ -43,9 +43,14 @@ public class MainActivity : MauiAppCompatActivity
         if (player is null)
             return;
 
-        var extension = string.Equals(Path.GetExtension(GetDisplayName(uri)), ".m3u8", StringComparison.OrdinalIgnoreCase) ? ".m3u8" : ".m3u";
-        var fileName = $"shared-{DateTime.UtcNow:yyyyMMddHHmmss}{extension}";
-        var target = Path.Combine(FileSystem.CacheDirectory, fileName);
+        var displayName = Path.GetFileName(GetDisplayName(uri));
+        var extension = string.Equals(Path.GetExtension(displayName), ".m3u8", StringComparison.OrdinalIgnoreCase) ? ".m3u8" : ".m3u";
+        var fileName = string.IsNullOrEmpty(displayName) || !string.Equals(Path.GetExtension(displayName), extension, StringComparison.OrdinalIgnoreCase)
+            ? $"shared{extension}"
+            : displayName;
+        var folder = Path.Combine(FileSystem.CacheDirectory, $"shared-{DateTime.UtcNow:yyyyMMddHHmmss}");
+        Directory.CreateDirectory(folder);
+        var target = Path.Combine(folder, fileName);
         await using var input = Android.App.Application.Context.ContentResolver?.OpenInputStream(uri);
         if (input is null)
             return;

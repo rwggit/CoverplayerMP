@@ -15,7 +15,8 @@ public static class PlaylistParser
             ? new System.Text.UTF8Encoding(false)
             : Encoding;
 
-    public static byte[] WriteBytes(IEnumerable<Track> tracks, string? fileName = null) => GetEncoding(fileName).GetBytes(Write(tracks));
+    public static byte[] WriteBytes(IEnumerable<Track> tracks, string? fileName = null, string? targetDirectory = null) =>
+        GetEncoding(fileName).GetBytes(Write(tracks, targetDirectory));
 
     public static IReadOnlyList<Track> Parse(string content, string? baseDirectory = null)
     {
@@ -42,14 +43,17 @@ public static class PlaylistParser
             }
 
             var source = NormalizeSeparators(line);
-            if (!Uri.TryCreate(source, UriKind.Absolute, out var uri) && baseDirectory is not null)
+            var isRelative = !Uri.TryCreate(source, UriKind.Absolute, out var uri) && !Path.IsPathRooted(source);
+            if (isRelative && baseDirectory is not null)
                 source = Path.GetFullPath(Path.Combine(baseDirectory, source));
+            else
+                isRelative = false;
 
             var title = pendingInfo ?? pendingTitle ?? Path.GetFileNameWithoutExtension(source);
             var separator = title.IndexOf(" - ", StringComparison.Ordinal);
             var artist = separator > 0 ? title[..separator].Trim() : "Unbekannter Interpret";
             var trackTitle = separator > 0 ? title[(separator + 3)..].Trim() : title;
-            result.Add(new Track(source, trackTitle, artist, source));
+            result.Add(new Track(source, trackTitle, artist, source, isRelative));
             pendingInfo = null;
             pendingTitle = null;
         }
@@ -83,15 +87,24 @@ public static class PlaylistParser
                extension.Equals(".opus", StringComparison.OrdinalIgnoreCase);
     }
 
-    public static string Write(IEnumerable<Track> tracks)
+    public static string Write(IEnumerable<Track> tracks, string? targetDirectory = null)
     {
         var builder = new System.Text.StringBuilder("#EXTM3U\n");
         foreach (var track in tracks)
         {
             builder.Append("#EXTINF:-1,").Append(track.Artist).Append(" - ").Append(track.Title).Append('\n');
-            builder.Append(track.Source).Append('\n');
+            builder.Append(GetEntryPath(track, targetDirectory)).Append('\n');
         }
 
         return builder.ToString();
+    }
+
+    private static string GetEntryPath(Track track, string? targetDirectory)
+    {
+        if (!track.IsRelativePath || string.IsNullOrEmpty(targetDirectory) || !Path.IsPathRooted(track.Source))
+            return track.Source;
+
+        var relative = Path.GetRelativePath(targetDirectory, track.Source);
+        return Path.IsPathRooted(relative) ? track.Source : relative;
     }
 }
