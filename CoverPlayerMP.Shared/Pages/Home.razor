@@ -285,6 +285,7 @@
                                @oninput="OnCrossfadeChanged" />
                         <span class="setting-value">@Player.CrossfadeSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) s</span>
                     </label>
+                    <button @onclick="OpenAnimationsAsync">Animationen</button>
                     @if (Player.CanQuit)
                     {
                         <button @onclick="RequestQuit">Beenden</button>
@@ -301,6 +302,42 @@
                     <button @onclick="() => QuitAsync(false)">Ohne Speichern beenden</button>
                     <button @onclick="() => quitConfirmVisible = false">Abbrechen</button>
                 }
+            </section>
+        </div>
+    }
+    @if (animationChoices is not null)
+    {
+        <div class="insert-overlay" @onclick="CloseAnimations" @onclick:stopPropagation="true">
+            <section class="info-dialog" @onclick:stopPropagation="true">
+                <div class="control-dialog-header">
+                    <span>Animationen (@animationChoices.Count(a => a.Active) von @animationChoices.Count)</span>
+                    <button class="close-button" title="Schließen" @onclick="CloseAnimations">×</button>
+                </div>
+                <div class="animation-toolbar">
+                    <button @onclick="() => SetAllAnimations(true)">Alle</button>
+                    <button @onclick="() => SetAllAnimations(false)">Keine</button>
+                </div>
+                <div class="animation-list">
+                    @foreach (var group in animationChoices.GroupBy(a => a.Group))
+                    {
+                        <label class="animation-group">
+                            <input type="checkbox" checked="@group.All(a => a.Active)"
+                                   @onchange="e => SetGroup(group.Key, e.Value is true)" />
+                            @group.Key
+                        </label>
+                        @foreach (var choice in group)
+                        {
+                            <label class="animation-item">
+                                <input type="checkbox" @bind="choice.Active" />
+                                @choice.Label
+                            </label>
+                        }
+                    }
+                </div>
+                <div class="animation-toolbar">
+                    <button class="play-button" @onclick="SaveAnimationsAsync">Übernehmen</button>
+                    <button @onclick="CloseAnimations">Abbrechen</button>
+                </div>
             </section>
         </div>
     }
@@ -382,8 +419,59 @@
         CloseOptions();
     }
 
+    private sealed class AnimationChoice
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public string Group { get; set; } = string.Empty;
+        public bool Active { get; set; }
+    }
+
+    private List<AnimationChoice>? animationChoices;
+
+    private async Task OpenAnimationsAsync()
+    {
+        try
+        {
+            animationChoices = (await Js.InvokeAsync<AnimationChoice[]>("coverTransition.getAnimations")).ToList();
+        }
+        catch (JSException)
+        {
+            animationChoices = null;
+        }
+    }
+
+    private void CloseAnimations() => animationChoices = null;
+
+    private void SetAllAnimations(bool value)
+    {
+        foreach (var choice in animationChoices ?? [])
+            choice.Active = value;
+    }
+
+    private void SetGroup(string group, bool value)
+    {
+        foreach (var choice in animationChoices?.Where(a => a.Group == group) ?? [])
+            choice.Active = value;
+    }
+
+    private async Task SaveAnimationsAsync()
+    {
+        if (animationChoices is null)
+            return;
+
+        var names = animationChoices.Where(a => a.Active).Select(a => a.Name).ToArray();
+        await Js.InvokeVoidAsync("coverTransition.setActiveAnimations", (object)names);
+        animationChoices = null;
+    }
+
     private bool HandleBack()
     {
+        if (animationChoices is not null)
+        {
+            _ = InvokeAsync(() => { animationChoices = null; StateHasChanged(); });
+            return true;
+        }
         if (optionsVisible)
         {
             _ = InvokeAsync(() => { CloseOptions(); StateHasChanged(); });

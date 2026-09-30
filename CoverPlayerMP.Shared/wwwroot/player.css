@@ -113,6 +113,17 @@
     overflow: auto;
 }
 .info-list dt { color: #8c91a3; }
+.animation-toolbar { display: flex; gap: .5rem; margin: .5rem 0; }
+.animation-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+}
+.animation-list label { display: flex; gap: .5rem; align-items: center; padding: .25rem 0; cursor: pointer; }
+.animation-group { margin-top: .5rem; color: #c9cde0; font-weight: 600; }
+.animation-item { padding-left: 1.5rem !important; }
 .picture-list {
     display: flex;
     flex-direction: column;

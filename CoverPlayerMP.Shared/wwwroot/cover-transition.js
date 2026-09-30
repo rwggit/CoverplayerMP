@@ -450,14 +450,82 @@ window.coverTransition = (() => {
         half((p, t) => p.butterfly(t, false), (p, t) => p.butterfly(t, true))
     ];
 
+    const catalog = [
+        ["AnimationReinRausRollen1", "Rein/Raus rollen 1", "Rollen"],
+        ["AnimationReinRausRollen2", "Rein/Raus rollen 2", "Rollen"],
+        ["AnimationReinRausRollen3", "Rein/Raus rollen 3", "Rollen"],
+        ["AnimationReinRausRollen4", "Rein/Raus rollen 4", "Rollen"],
+        ["AnimationReinRausRollenSkalieren", "Rein/Raus rollen skalieren", "Rollen"],
+        ["AnimationRollenSkalieren", "Rollen skalieren", "Rollen"],
+        ["AnimationZoomHG", "Zoom Hintergrund", "Hintergrund"],
+        ["AnimationUhrHG", "Uhr Hintergrund", "Hintergrund"],
+        ["AnimationDreieckeFallen5HG", "Dreiecke fallen 5", "Dreiecke fallen"],
+        ["AnimationDreieckeFallen30HG", "Dreiecke fallen 30", "Dreiecke fallen"],
+        ["AnimationDreieckeFallen100HG", "Dreiecke fallen 100", "Dreiecke fallen"],
+        ["AnimationDreieckeFallenUmkehr5", "Dreiecke fallen Umkehr 5", "Dreiecke fallen"],
+        ["AnimationDreieckeFallenUmkehr30", "Dreiecke fallen Umkehr 30", "Dreiecke fallen"],
+        ["AnimationDreieckeFallenUmkehr100", "Dreiecke fallen Umkehr 100", "Dreiecke fallen"],
+        ["AnimationDreieckeExplosion20HG", "Dreiecke Explosion 20", "Dreiecke Explosion"],
+        ["AnimationDreieckeExplosion50HG", "Dreiecke Explosion 50", "Dreiecke Explosion"],
+        ["AnimationDreieckeExplosion100HG", "Dreiecke Explosion 100", "Dreiecke Explosion"],
+        ["AnimationDreieckeImplosion20", "Dreiecke Implosion 20", "Dreiecke Explosion"],
+        ["AnimationDreieckeImplosion50", "Dreiecke Implosion 50", "Dreiecke Explosion"],
+        ["AnimationDreieckeImplosion100", "Dreiecke Implosion 100", "Dreiecke Explosion"],
+        ["AnimationDrehenHG", "Drehen Hintergrund", "Hintergrund"],
+        ["AnimationTauschenLinksRechtsHG", "Tauschen links/rechts Hintergrund", "Hintergrund"],
+        ["AnimationTauschenObenUntenHG", "Tauschen oben/unten Hintergrund", "Hintergrund"],
+        ["AnimationZoomObenLinksHG", "Zoom oben links Hintergrund", "Hintergrund"],
+        ["AnimationDrehen2HG", "Drehen 2 Hintergrund", "Hintergrund"],
+        ["AnimationRauteHG", "Raute Hintergrund", "Hintergrund"],
+        ["AnimationNachUntenRechtsHG", "Nach unten rechts Hintergrund", "Hintergrund"],
+        ["AnimationNachObenLinksHG", "Nach oben links Hintergrund", "Hintergrund"],
+        ["AnimationSchmetterlingHG", "Schmetterling Hintergrund", "Hintergrund"],
+        ["AnimationUhr", "Uhr", "Klassisch"],
+        ["AnimationZoom", "Zoom", "Klassisch"],
+        ["AnimationDrehen", "Drehen", "Klassisch"],
+        ["AnimationTauschenLinksRechts", "Tauschen links/rechts", "Klassisch"],
+        ["AnimationTauschenObenUnten", "Tauschen oben/unten", "Klassisch"],
+        ["AnimationZoomObenLinks", "Zoom oben links", "Klassisch"],
+        ["AnimationDrehen2", "Drehen 2", "Klassisch"],
+        ["AnimationRaute", "Raute", "Klassisch"],
+        ["AnimationNachUntenRechts", "Nach unten rechts", "Klassisch"],
+        ["AnimationNachObenLinks", "Nach oben links", "Klassisch"],
+        ["AnimationSchmetterling", "Schmetterling", "Klassisch"]
+    ];
+
+    const storageKey = "coverPlayer.activeAnimations";
+    let active = null;
+    try {
+        const saved = JSON.parse(localStorage.getItem(storageKey) ?? "null");
+        if (Array.isArray(saved) && saved.length > 0) active = new Set(saved);
+    } catch { }
+
+    const isActive = i => active === null || active.has(catalog[i][0]);
+
     function nextAnimation() {
-        aniIndex++;
-        if (aniIndex >= animations.length) {
-            aniIndex = 0;
-            subdivisions += 2;
-            if (subdivisions > 8) subdivisions = 1;
+        for (let tries = 0; tries <= animations.length; tries++) {
+            aniIndex++;
+            if (aniIndex >= animations.length) {
+                aniIndex = 0;
+                subdivisions += 2;
+                if (subdivisions > 8) subdivisions = 1;
+            }
+            if (isActive(aniIndex)) break;
         }
         return { fn: animations[aniIndex], n: subdivisions };
+    }
+
+    function getAnimations() {
+        return catalog.map(([name, label, group], i) => ({ name, label, group, active: isActive(i) }));
+    }
+
+    function setActiveAnimations(names) {
+        const valid = (names ?? []).filter(n => catalog.some(c => c[0] === n));
+        active = valid.length === 0 || valid.length === catalog.length ? null : new Set(valid);
+        try {
+            if (active === null) localStorage.removeItem(storageKey);
+            else localStorage.setItem(storageKey, JSON.stringify([...active]));
+        } catch { }
     }
 
     function resize(canvas, st) {
@@ -561,5 +629,5 @@ window.coverTransition = (() => {
         requestAnimationFrame(() => frame(canvas, st, anim));
     }
 
-    return { show };
+    return { show, getAnimations, setActiveAnimations };
 })();
