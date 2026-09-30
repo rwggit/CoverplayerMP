@@ -43,7 +43,8 @@ public class MainActivity : MauiAppCompatActivity
         if (player is null)
             return;
 
-        var fileName = $"shared-{DateTime.UtcNow:yyyyMMddHHmmss}.m3u";
+        var extension = string.Equals(Path.GetExtension(GetDisplayName(uri)), ".m3u8", StringComparison.OrdinalIgnoreCase) ? ".m3u8" : ".m3u";
+        var fileName = $"shared-{DateTime.UtcNow:yyyyMMddHHmmss}{extension}";
         var target = Path.Combine(FileSystem.CacheDirectory, fileName);
         await using var input = Android.App.Application.Context.ContentResolver?.OpenInputStream(uri);
         if (input is null)
@@ -52,5 +53,18 @@ public class MainActivity : MauiAppCompatActivity
             await input.CopyToAsync(output);
         await player.LoadPlaylistAsync(target);
         await player.PlayAsync(0);
+    }
+
+    private static string? GetDisplayName(Android.Net.Uri uri)
+    {
+        using var cursor = Android.App.Application.Context.ContentResolver?.Query(uri, [Android.Provider.IOpenableColumns.DisplayName], null, null, null);
+        if (cursor is not null && cursor.MoveToFirst())
+        {
+            var name = cursor.GetString(0);
+            if (!string.IsNullOrEmpty(name))
+                return name;
+        }
+
+        return uri.LastPathSegment;
     }
 }

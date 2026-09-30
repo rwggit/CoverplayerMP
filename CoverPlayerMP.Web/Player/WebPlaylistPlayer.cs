@@ -135,7 +135,7 @@ public sealed class WebPlaylistPlayer(IJSRuntime js) : IPlaylistPlayer
     public async Task<string?> SavePlaylistAsync(CancellationToken cancellationToken = default)
     {
         const string name = "CoverPlayer.m3u";
-        await js.InvokeVoidAsync("coverPlayer.download", cancellationToken, name, PlaylistParser.Write(tracks));
+        await js.InvokeVoidAsync("coverPlayer.download", cancellationToken, name, PlaylistParser.WriteBytes(tracks));
         IsPlaylistModified = false;
         StateChanged?.Invoke(this, EventArgs.Empty);
         return name;

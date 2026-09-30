@@ -105,7 +105,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
             else
             {
                 await using var stream = await result.OpenReadAsync();
-                using var reader = new StreamReader(stream);
+                using var reader = new StreamReader(stream, PlaylistParser.GetEncoding(result.FileName), false);
                 await LoadPlaylistAsync(await reader.ReadToEndAsync(cancellationToken), true, cancellationToken);
             }
 
@@ -123,7 +123,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
     {
         try
         {
-            var content = isContent ? pathOrContent : await File.ReadAllTextAsync(pathOrContent, cancellationToken);
+            var content = isContent ? pathOrContent : await File.ReadAllTextAsync(pathOrContent, PlaylistParser.GetEncoding(pathOrContent), cancellationToken);
             var baseDirectory = isContent ? null : Path.GetDirectoryName(pathOrContent);
             tracks = PlaylistParser.Parse(content, baseDirectory).ToList();
             playlistPath = isContent ? null : pathOrContent;
@@ -336,7 +336,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
                 target = Path.Combine(folder, $"CoverPlayer-{DateTime.Now:yyyyMMdd-HHmmss}.m3u");
             }
 
-            await File.WriteAllTextAsync(target, PlaylistParser.Write(tracks), cancellationToken);
+            await File.WriteAllTextAsync(target, PlaylistParser.Write(tracks), PlaylistParser.GetEncoding(target), cancellationToken);
             playlistPath = target;
             IsPlaylistModified = false;
             RaiseStateChanged();

@@ -2,6 +2,21 @@ namespace CoverPlayerMP.Shared.Player;
 
 public static class PlaylistParser
 {
+    public static System.Text.Encoding Encoding { get; } = CreateEncoding();
+
+    private static System.Text.Encoding CreateEncoding()
+    {
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+        return System.Text.Encoding.GetEncoding(1252);
+    }
+
+    public static System.Text.Encoding GetEncoding(string? fileName) =>
+        string.Equals(Path.GetExtension(fileName), ".m3u8", StringComparison.OrdinalIgnoreCase)
+            ? new System.Text.UTF8Encoding(false)
+            : Encoding;
+
+    public static byte[] WriteBytes(IEnumerable<Track> tracks, string? fileName = null) => GetEncoding(fileName).GetBytes(Write(tracks));
+
     public static IReadOnlyList<Track> Parse(string content, string? baseDirectory = null)
     {
         var result = new List<Track>();
@@ -26,7 +41,7 @@ public static class PlaylistParser
                 continue;
             }
 
-            var source = line;
+            var source = NormalizeSeparators(line);
             if (!Uri.TryCreate(source, UriKind.Absolute, out var uri) && baseDirectory is not null)
                 source = Path.GetFullPath(Path.Combine(baseDirectory, source));
 
@@ -40,6 +55,16 @@ public static class PlaylistParser
         }
 
         return result;
+    }
+
+    private static string NormalizeSeparators(string path)
+    {
+        // Web-Adressen nicht anfassen – dort ist '/' Teil der Adresse
+        if (Uri.TryCreate(path, UriKind.Absolute, out var uri) && !uri.IsFile)
+            return path;
+
+        return path.Replace('\\', Path.DirectorySeparatorChar)
+                   .Replace('/', Path.DirectorySeparatorChar);
     }
 
     private static bool IsTrackSource(string line)

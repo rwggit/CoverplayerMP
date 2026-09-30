@@ -1,10 +1,10 @@
-window.coverPlayer = (() => {
+﻿window.coverPlayer = (() => {
     const audio = new Audio();
     const pickPlaylist = () => new Promise(resolve => {
         const input = document.createElement("input");
         input.type = "file";
         input.accept = ".m3u,.m3u8,audio/x-mpegurl";
-        input.onchange = async () => resolve(input.files.length ? await input.files[0].text() : null);
+        input.onchange = async () => { const file = input.files[0]; resolve(file ? new TextDecoder(/\.m3u8$/i.test(file.name) ? "utf-8" : "windows-1252").decode(await file.arrayBuffer()) : null); };
         input.click();
     });
     const readDuration = url => new Promise(resolve => {
