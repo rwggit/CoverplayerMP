@@ -15,6 +15,8 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
     private bool isDisposed;
     private List<Track> tracks = [];
     private int currentIndex = -1;
+    private int? failedTransitionIndex;
+    private int failedTransitionOffset;
     private double volume = 1;
     private double crossfadeSeconds = 2;
 
@@ -122,6 +124,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
             var baseDirectory = isContent ? null : Path.GetDirectoryName(pathOrContent);
             tracks = PlaylistParser.Parse(content, baseDirectory).ToList();
             currentIndex = -1;
+            failedTransitionIndex = null;
             ErrorMessage = tracks.Count == 0 ? "Die Playlist enthält keine abspielbaren Titel." : null;
             RaiseStateChanged();
         }
@@ -204,6 +207,12 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
 
     private async Task LoadTrackAsync(int index, CancellationToken cancellationToken)
     {
+        var source = tracks[index].Source;
+        if (!File.Exists(source))
+            throw new FileNotFoundException($"Audiodatei nicht gefunden: {source}", source);
+
+        var next = await CreatePlayerAsync(source, cancellationToken);
+
         monitorCancellation?.Cancel();
         if (audioPlayer is not null)
         {
@@ -211,11 +220,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
             audioPlayer.Dispose();
         }
 
-        var source = tracks[index].Source;
-        if (!File.Exists(source))
-            throw new FileNotFoundException($"Audiodatei nicht gefunden: {source}", source);
-
-        audioPlayer = await CreatePlayerAsync(source, cancellationToken);
+        audioPlayer = next;
         audioPlayer.Volume = 0;
         currentIndex = index;
         await FadeToAsync(volume, cancellationToken);
@@ -243,15 +248,20 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
         var version = Interlocked.Increment(ref transitionVersion);
 
         var lockTaken = false;
+        var index = -1;
         try
         {
             await transitionLock.WaitAsync(transitionCancellation.Token);
             lockTaken = true;
             transitionCancellation.Token.ThrowIfCancellationRequested();
-            var index = (currentIndex + offset + tracks.Count) % tracks.Count;
+            var baseIndex = failedTransitionIndex is { } failed && failedTransitionOffset == offset
+                ? failed
+                : currentIndex;
+            index = (baseIndex + offset + tracks.Count) % tracks.Count;
 
             if (index == currentIndex && audioPlayer is not null)
             {
+                failedTransitionIndex = null;
                 await RestartAsync(transitionCancellation.Token);
                 return;
             }
@@ -259,6 +269,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
             if (audioPlayer is null || !IsPlaying)
             {
                 await LoadTrackAsync(index, transitionCancellation.Token);
+                OnTransitionSucceeded();
                 audioPlayer?.Play();
                 IsPlaying = true;
                 IsPaused = false;
@@ -268,13 +279,27 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
             }
 
             await CrossfadeToAsync(index, transitionCancellation.Token, version);
+            OnTransitionSucceeded();
         }
         catch (OperationCanceledException) when (transitionCancellation.IsCancellationRequested)
         {
         }
         catch (Exception ex) when (!isDisposed)
         {
-            SetError($"Übergang konnte nicht ausgeführt werden: {ex.Message}");
+            if (index >= 0 && index < tracks.Count)
+            {
+                failedTransitionIndex = index;
+                failedTransitionOffset = offset;
+                var track = tracks[index];
+                var name = string.IsNullOrWhiteSpace(track.Title)
+                    ? Path.GetFileName(track.Source)
+                    : track.Title;
+                SetError($"„{name}“ kann nicht abgespielt werden: {ex.Message}");
+            }
+            else
+            {
+                SetError($"Übergang konnte nicht ausgeführt werden: {ex.Message}");
+            }
         }
         finally
         {
@@ -287,6 +312,12 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
                 transitionLock.Release();
             transitionCancellation.Dispose();
         }
+    }
+
+    private void OnTransitionSucceeded()
+    {
+        failedTransitionIndex = null;
+        ErrorMessage = null;
     }
 
     private void StartMonitor()
@@ -343,7 +374,11 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
             return;
         }
 
-        var next = await CreatePlayerAsync(tracks[nextIndex].Source, token);
+        var nextSource = tracks[nextIndex].Source;
+        if (!File.Exists(nextSource))
+            throw new FileNotFoundException($"Audiodatei nicht gefunden: {nextSource}", nextSource);
+
+        var next = await CreatePlayerAsync(nextSource, token);
         next.Volume = 0;
         next.Play();
         audioPlayer = next;
