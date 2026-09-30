@@ -1,4 +1,5 @@
 using Android.Media;
+using Android.Media.Audiofx;
 using Plugin.Maui.Audio;
 
 namespace CoverPlayerMP.Platforms.Android;
@@ -6,6 +7,7 @@ namespace CoverPlayerMP.Platforms.Android;
 public sealed class AndroidFilePlayer : IAudioPlayer
 {
     private readonly MediaPlayer player = new();
+    private LoudnessEnhancer? offloadBlocker;
     private double volume = 1;
     private double balance;
     private bool disposed;
@@ -17,6 +19,20 @@ public sealed class AndroidFilePlayer : IAudioPlayer
             .SetContentType(AudioContentType.Music)!
             .Build()!);
         player.SetDataSource(path);
+
+        // Neutraler Effekt verhindert Offload-Wiedergabe, damit parallele
+        // Player (Crossfade) den laufenden Stream nicht kurz unterbrechen.
+        try
+        {
+            offloadBlocker = new LoudnessEnhancer(player.AudioSessionId);
+            offloadBlocker.SetTargetGain(0);
+            offloadBlocker.SetEnabled(true);
+        }
+        catch (Java.Lang.RuntimeException)
+        {
+            offloadBlocker = null;
+        }
+
         player.Prepare();
         player.Completion += (_, _) => PlaybackEnded?.Invoke(this, EventArgs.Empty);
         player.Error += (_, e) =>
@@ -99,6 +115,9 @@ public sealed class AndroidFilePlayer : IAudioPlayer
         if (disposed)
             return;
         disposed = true;
+        offloadBlocker?.Release();
+        offloadBlocker?.Dispose();
+        offloadBlocker = null;
         player.Release();
         player.Dispose();
     }

@@ -10,6 +10,11 @@ public partial class App : Application
     protected override Window CreateWindow(IActivationState? activationState)
     {
         var window = new Window(new MainPage()) { Title = "CoverPlayerMP" };
+        window.Destroying += async (_, _) =>
+        {
+            if (IPlatformApplication.Current?.Services.GetService<CoverPlayerMP.Shared.Player.IPlaylistPlayer>() is IAsyncDisposable player)
+                await player.DisposeAsync();
+        };
 #if WINDOWS
         window.Created += (_, _) =>
         {
