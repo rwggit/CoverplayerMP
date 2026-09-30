@@ -11,7 +11,10 @@
     {
         <div class="player-error" role="alert">@Player.ErrorMessage</div>
     }
-    <div class="cover-stage">
+    <div class="cover-stage"
+         @onpointerdown="OnSwipeStart"
+         @onpointerup="OnSwipeEndAsync"
+         @onpointercancel="() => swipeStart = null">
         <canvas class="cover-image" @ref="coverCanvas"></canvas>
         @if (string.IsNullOrWhiteSpace(coverUri))
         {
@@ -392,8 +395,43 @@
         _ = InvokeAsync(StateHasChanged);
     }
 
+    private (double X, double Y, DateTime Time)? swipeStart;
+    private bool suppressClick;
+
+    private void OnSwipeStart(PointerEventArgs e)
+    {
+        suppressClick = false;
+        swipeStart = (e.ClientX, e.ClientY, DateTime.UtcNow);
+    }
+
+    private async Task OnSwipeEndAsync(PointerEventArgs e)
+    {
+        if (swipeStart is not { } start)
+            return;
+        swipeStart = null;
+
+        var dx = e.ClientX - start.X;
+        var dy = e.ClientY - start.Y;
+        if (Math.Abs(dx) < 60 || Math.Abs(dx) < Math.Abs(dy) * 1.5 ||
+            DateTime.UtcNow - start.Time > TimeSpan.FromMilliseconds(800) ||
+            Player.Tracks.Count == 0)
+            return;
+
+        suppressClick = true;
+        if (dx > 0)
+            await NextAsync();
+        else
+            await PreviousAsync();
+    }
+
     private void ShowControls()
     {
+        if (suppressClick)
+        {
+            suppressClick = false;
+            return;
+        }
+
         controlsVisible = true;
     }
 

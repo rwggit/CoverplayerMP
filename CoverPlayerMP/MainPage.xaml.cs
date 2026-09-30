@@ -7,6 +7,9 @@ public partial class MainPage : ContentPage
         InitializeComponent();
     }
 
-    protected override bool OnBackButtonPressed() =>
-        CoverPlayerMP.Shared.Player.BackNavigation.TryHandle() || base.OnBackButtonPressed();
+    protected override bool OnBackButtonPressed()
+    {
+        CoverPlayerMP.Shared.Player.BackNavigation.TryHandle();
+        return true;
+    }
 }

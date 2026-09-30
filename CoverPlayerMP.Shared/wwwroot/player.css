@@ -42,6 +42,7 @@
     display: grid;
     place-items: center;
     background: radial-gradient(circle, #272a35 0, #090a0f 75%);
+    touch-action: pan-y;
 }
 
 .cover-image {
