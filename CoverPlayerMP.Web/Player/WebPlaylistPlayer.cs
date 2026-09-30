@@ -7,6 +7,8 @@ public sealed class WebPlaylistPlayer(IJSRuntime js) : IPlaylistPlayer
 {
     private readonly IJSRuntime js = js;
     private List<Track> tracks = [];
+    public bool IsPlaylistModified { get; private set; }
+    public bool CanQuit => false;
     private int currentIndex = -1;
     private double volume = 1;
     private double crossfadeSeconds = 2;
@@ -42,6 +44,7 @@ public sealed class WebPlaylistPlayer(IJSRuntime js) : IPlaylistPlayer
         if (string.IsNullOrWhiteSpace(content))
             return;
         tracks = PlaylistParser.Parse(content).ToList();
+        IsPlaylistModified = false;
         currentIndex = -1;
         if (tracks.Count > 0)
             await PlayAsync(0, cancellationToken);
@@ -103,6 +106,7 @@ public sealed class WebPlaylistPlayer(IJSRuntime js) : IPlaylistPlayer
         if (tracks.Count == 0)
         {
             tracks = [track];
+            IsPlaylistModified = true;
             currentIndex = -1;
             await PlayAsync(0, cancellationToken);
             return;
@@ -118,6 +122,7 @@ public sealed class WebPlaylistPlayer(IJSRuntime js) : IPlaylistPlayer
         };
 
         tracks.Insert(index, track);
+        IsPlaylistModified = true;
         if (currentIndex >= 0 && index <= currentIndex)
             currentIndex++;
 
@@ -125,6 +130,19 @@ public sealed class WebPlaylistPlayer(IJSRuntime js) : IPlaylistPlayer
             await PlayAsync(index, cancellationToken);
         else
             StateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public async Task<string?> SavePlaylistAsync(CancellationToken cancellationToken = default)
+    {
+        const string name = "CoverPlayer.m3u";
+        await js.InvokeVoidAsync("coverPlayer.download", cancellationToken, name, PlaylistParser.Write(tracks));
+        IsPlaylistModified = false;
+        StateChanged?.Invoke(this, EventArgs.Empty);
+        return name;
+    }
+
+    public void Quit()
+    {
     }
 
     private sealed record LibraryFile(string Source, string Title, string Artist, double Duration);

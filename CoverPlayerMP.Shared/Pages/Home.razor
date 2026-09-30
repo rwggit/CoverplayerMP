@@ -37,7 +37,12 @@
         <section class="control-dialog" @onclick:stopPropagation="true">
             <div class="control-dialog-header">
                 <span>Player-Steuerung</span>
-                <button class="close-button" title="Steuerung ausblenden" @onclick="HideControls">×</button>
+                <button class="close-button" title="Einstellungen" aria-label="Einstellungen" @onclick="OpenOptions">
+                    <svg viewBox="0 0 24 24" width="0.8em" height="0.8em" fill="currentColor" aria-hidden="true" focusable="false">
+                        <path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6a.5.5 0 0 0 .1-.6l-2-3.5a.5.5 0 0 0-.6-.2l-2.5 1a7.3 7.3 0 0 0-1.7-1l-.4-2.6a.5.5 0 0 0-.5-.4h-4a.5.5 0 0 0-.5.4l-.4 2.6a7.3 7.3 0 0 0-1.7 1l-2.5-1a.5.5 0 0 0-.6.2l-2 3.5a.5.5 0 0 0 .1.6L4.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6a.5.5 0 0 0-.1.6l2 3.5a.5.5 0 0 0 .6.2l2.5-1a7.3 7.3 0 0 0 1.7 1l.4 2.6a.5.5 0 0 0 .5.4h4a.5.5 0 0 0 .5-.4l.4-2.6a7.3 7.3 0 0 0 1.7-1l2.5 1a.5.5 0 0 0 .6-.2l2-3.5a.5.5 0 0 0-.1-.6zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" />
+                    </svg>
+                </button>
+                <button class="close-button" title="Steuerung ausblenden" aria-label="Steuerung ausblenden" @onclick="HideControls">×</button>
             </div>
             <div class="control-row timeline-row">
                 <span>@FormatTime(displayPosition)</span>
@@ -113,17 +118,7 @@
                 </div>
                 <label class="setting-row setting-inline">
                     <span class="setting-icon"
-                          title="Dauer der Überblendung"
-                          aria-label="Dauer der Überblendung">↔</span>
-                    <span class="setting-value">@Player.CrossfadeSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) s</span>
-                    <input type="range" min="0" max="5" step="0.1"
-                           title="Dauer der Überblendung: @Player.CrossfadeSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) Sekunden"
-                           value="@Player.CrossfadeSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)"
-                           @oninput="OnCrossfadeChanged" />
-                </label>
-                <label class="setting-row setting-inline">
-                    <span class="setting-icon"
-                          title="Lautstärke: @Math.Round(Player.Volume * 100) Prozent"
+                          title="Lautstärke:
                           aria-label="Lautstärke">🔊</span>
                     <span class="setting-value">@Math.Round(Player.Volume * 100) %</span>
                     <input type="range" min="0" max="1" step="0.01"
@@ -272,6 +267,43 @@
             </section>
         </div>
     }
+    @if (optionsVisible)
+    {
+        <div class="insert-overlay" @onclick="CloseOptions" @onclick:stopPropagation="true">
+            <section class="insert-dialog" @onclick:stopPropagation="true">
+                <div class="control-dialog-header">
+                    <span>Einstellungen</span>
+                    <button class="close-button" title="Schließen" @onclick="CloseOptions">×</button>
+                </div>
+                @if (!quitConfirmVisible)
+                {
+                    <label class="setting-row">
+                        <span>Überblendung</span>
+                        <input type="range" min="0" max="5" step="0.1"
+                               title="Dauer der Überblendung: @Player.CrossfadeSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) Sekunden"
+                               value="@Player.CrossfadeSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                               @oninput="OnCrossfadeChanged" />
+                        <span class="setting-value">@Player.CrossfadeSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) s</span>
+                    </label>
+                    @if (Player.CanQuit)
+                    {
+                        <button @onclick="RequestQuit">Beenden</button>
+                    }
+                    else if (Player.IsPlaylistModified)
+                    {
+                        <button @onclick="SaveOnlyAsync">Playlist speichern</button>
+                    }
+                }
+                else
+                {
+                    <span>Die Playlist wurde verändert. Soll sie vor dem Beenden gespeichert werden?</span>
+                    <button @onclick="() => QuitAsync(true)">Speichern und beenden</button>
+                    <button @onclick="() => QuitAsync(false)">Ohne Speichern beenden</button>
+                    <button @onclick="() => quitConfirmVisible = false">Abbrechen</button>
+                }
+            </section>
+        </div>
+    }
 </div>
 
 @code {
@@ -310,8 +342,53 @@
 
     private void ClosePictures() => pictures = null;
 
+    private bool optionsVisible;
+    private bool quitConfirmVisible;
+
+    private void OpenOptions()
+    {
+        quitConfirmVisible = false;
+        optionsVisible = true;
+    }
+
+    private void CloseOptions()
+    {
+        optionsVisible = false;
+        quitConfirmVisible = false;
+    }
+
+    private void RequestQuit()
+    {
+        if (Player.IsPlaylistModified && Player.Tracks.Count > 0)
+            quitConfirmVisible = true;
+        else
+            Player.Quit();
+    }
+
+    private async Task QuitAsync(bool save)
+    {
+        if (save && await Player.SavePlaylistAsync() is null)
+        {
+            CloseOptions();
+            return;
+        }
+
+        Player.Quit();
+    }
+
+    private async Task SaveOnlyAsync()
+    {
+        await Player.SavePlaylistAsync();
+        CloseOptions();
+    }
+
     private bool HandleBack()
     {
+        if (optionsVisible)
+        {
+            _ = InvokeAsync(() => { CloseOptions(); StateHasChanged(); });
+            return true;
+        }
         if (pictures is not null)
         {
             _ = InvokeAsync(() => { pictures = null; StateHasChanged(); });

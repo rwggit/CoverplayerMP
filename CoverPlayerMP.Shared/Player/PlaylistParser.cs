@@ -58,4 +58,15 @@ public static class PlaylistParser
                extension.Equals(".opus", StringComparison.OrdinalIgnoreCase);
     }
 
+    public static string Write(IEnumerable<Track> tracks)
+    {
+        var builder = new System.Text.StringBuilder("#EXTM3U\n");
+        foreach (var track in tracks)
+        {
+            builder.Append("#EXTINF:-1,").Append(track.Artist).Append(" - ").Append(track.Title).Append('\n');
+            builder.Append(track.Source).Append('\n');
+        }
+
+        return builder.ToString();
+    }
 }

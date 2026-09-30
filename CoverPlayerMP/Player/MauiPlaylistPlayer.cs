@@ -14,6 +14,9 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
     private CancellationTokenSource? transitionRequestCancellation;
     private bool isDisposed;
     private List<Track> tracks = [];
+    private string? playlistPath;
+    public bool IsPlaylistModified { get; private set; }
+    public bool CanQuit => true;
     private int currentIndex = -1;
     private int? failedTransitionIndex;
     private int failedTransitionOffset;
@@ -123,6 +126,8 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
             var content = isContent ? pathOrContent : await File.ReadAllTextAsync(pathOrContent, cancellationToken);
             var baseDirectory = isContent ? null : Path.GetDirectoryName(pathOrContent);
             tracks = PlaylistParser.Parse(content, baseDirectory).ToList();
+            playlistPath = isContent ? null : pathOrContent;
+            IsPlaylistModified = false;
             currentIndex = -1;
             failedTransitionIndex = null;
             ErrorMessage = tracks.Count == 0 ? "Die Playlist enthält keine abspielbaren Titel." : null;
@@ -279,6 +284,8 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
         if (tracks.Count == 0)
         {
             tracks = [track];
+            playlistPath = null;
+            IsPlaylistModified = true;
             currentIndex = -1;
             failedTransitionIndex = null;
             ErrorMessage = null;
@@ -296,6 +303,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
         };
 
         tracks.Insert(index, track);
+        IsPlaylistModified = true;
         if (currentIndex >= 0 && index <= currentIndex)
             currentIndex++;
         failedTransitionIndex = null;
@@ -309,6 +317,39 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
                 await NextAsync(cancellationToken);
         }
     }
+
+    public async Task<string?> SavePlaylistAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var target = playlistPath;
+            if (string.IsNullOrEmpty(target) || target.StartsWith(FileSystem.CacheDirectory, StringComparison.OrdinalIgnoreCase))
+            {
+#if ANDROID
+                var folder = Android.OS.Environment.GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryMusic)?.AbsolutePath
+                             ?? FileSystem.AppDataDirectory;
+#else
+                var folder = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
+                if (string.IsNullOrEmpty(folder))
+                    folder = FileSystem.AppDataDirectory;
+#endif
+                target = Path.Combine(folder, $"CoverPlayer-{DateTime.Now:yyyyMMdd-HHmmss}.m3u");
+            }
+
+            await File.WriteAllTextAsync(target, PlaylistParser.Write(tracks), cancellationToken);
+            playlistPath = target;
+            IsPlaylistModified = false;
+            RaiseStateChanged();
+            return target;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            SetError($"Playlist konnte nicht gespeichert werden: {ex.Message}");
+            return null;
+        }
+    }
+
+    public void Quit() => Application.Current?.Quit();
 
     private async Task LoadTrackAsync(int index, CancellationToken cancellationToken)
     {
