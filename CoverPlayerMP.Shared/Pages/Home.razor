@@ -25,6 +25,11 @@
         <span>@(Player.CurrentTrack?.Artist ?? "CoverPlayerMP")</span>
         <span class="caption-separator">—</span>
         <span>@(Player.CurrentTrack?.Title ?? "Playlist auswählen")</span>
+        @if (Player.CurrentTrack is not null)
+        {
+            <button class="info-button" title="Details zum Lied" aria-label="Details zum Lied"
+                    @onclick="ShowTrackInfo" @onclick:stopPropagation="true">i</button>
+        }
     </div>
 
     @if (controlsVisible)
@@ -189,6 +194,55 @@
             </section>
         </div>
     }
+
+    @if (trackInfo is not null)
+    {
+        <div class="insert-overlay" @onclick="CloseTrackInfo" @onclick:stopPropagation="true">
+            <section class="info-dialog" @onclick:stopPropagation="true">
+                <div class="control-dialog-header">
+                    <span>Details zum Lied</span>
+                    <button class="close-button" title="Schließen" @onclick="CloseTrackInfo">×</button>
+                </div>
+                <dl class="info-list">
+                    @foreach (var entry in trackInfo)
+                    {
+                        <dt>@entry.Key</dt>
+                        <dd>
+                            @entry.Value
+                            @if (entry.Key == "Tag-Typen")
+                            {
+                                <button class="info-button info-inline" title="Inhalt der Tags" aria-label="Inhalt der Tags"
+                                        @onclick="ShowRawTags">i</button>
+                            }
+                        </dd>
+                    }
+                </dl>
+            </section>
+        </div>
+    }
+
+    @if (rawTags is not null)
+    {
+        <div class="insert-overlay" @onclick="CloseRawTags" @onclick:stopPropagation="true">
+            <section class="info-dialog" @onclick:stopPropagation="true">
+                <div class="control-dialog-header">
+                    <span>Inhalt der Tags</span>
+                    <button class="close-button" title="Schließen" @onclick="CloseRawTags">×</button>
+                </div>
+                <dl class="info-list">
+                    @if (rawTags.Count == 0)
+                    {
+                        <dd>Keine Tags vorhanden.</dd>
+                    }
+                    @foreach (var entry in rawTags)
+                    {
+                        <dt>@entry.Key</dt>
+                        <dd>@entry.Value</dd>
+                    }
+                </dl>
+            </section>
+        </div>
+    }
 </div>
 
 @code {
@@ -207,8 +261,31 @@
         BackNavigation.Handler = HandleBack;
     }
 
+    private IReadOnlyList<KeyValuePair<string, string>>? trackInfo;
+
+    private void ShowTrackInfo() => trackInfo = TrackMetadata.Read(Player.CurrentTrack?.Source);
+
+    private void CloseTrackInfo() => trackInfo = null;
+
+    private IReadOnlyList<KeyValuePair<string, string>>? rawTags;
+
+    private void ShowRawTags() => rawTags = TrackMetadata.ReadRawTags(Player.CurrentTrack?.Source);
+
+    private void CloseRawTags() => rawTags = null;
+
     private bool HandleBack()
     {
+        if (rawTags is not null)
+        {
+            _ = InvokeAsync(() => { rawTags = null; StateHasChanged(); });
+            return true;
+        }
+        if (trackInfo is not null)
+        {
+            _ = InvokeAsync(() => { trackInfo = null; StateHasChanged(); });
+            return true;
+        }
+
         if (pendingTrack is null && !libraryVisible)
             return false;
 
