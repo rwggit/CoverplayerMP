@@ -1,5 +1,5 @@
 @page "/"
-@implements IDisposable
+@implements IAsyncDisposable
 @inject IPlaylistPlayer Player
 @inject IJSRuntime Js
 
@@ -50,18 +50,52 @@
             </div>
             <div class="control-toolbar">
                 <div class="control-buttons">
-                <button @onclick="OpenPlaylistAsync">Playlist öffnen</button>
+                <button @onclick="OpenPlaylistAsync"
+                        title="Playlist öffnen" aria-label="Playlist öffnen">
+                                            <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor"
+                                                 aria-hidden="true" focusable="false" style="vertical-align: -0.125em;">
+                                                <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.6l2 2h8.4A1.5 1.5 0 0 1 21 8.5V9H6.2a1.5 1.5 0 0 0-1.4 1L3 15.5z" />
+                                                <path d="M5.6 11a1 1 0 0 1 .9-.7h15.2a.8.8 0 0 1 .8 1l-2.1 7a1 1 0 0 1-1 .7H3.8a.8.8 0 0 1-.8-1z" />
+                                            </svg>
+                                        </button>
                 <button @onclick="PreviousAsync" disabled="@(Player.Tracks.Count == 0)"
-                        title="Vorheriges" aria-label="Vorheriges">&#x23EE;&#xFE0E;</button>
+                        title="Vorheriges" aria-label="Vorheriges">
+                                            <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor"
+                                                 aria-hidden="true" focusable="false" style="vertical-align: -0.125em;">
+                                                <rect x="4" y="4" width="3" height="16" rx="1" />
+                                                <path d="M20 4.5v15a.8.8 0 0 1-1.2.7L8.5 12.7a.8.8 0 0 1 0-1.4l10.3-7.5a.8.8 0 0 1 1.2.7z" />
+                                            </svg>
+                                        </button>
                 <button @onclick="RestartAsync" disabled="@(Player.CurrentTrack is null)"
                         title="Anfang" aria-label="Anfang">&#x21BA;&#xFE0E;</button>
                 <button class="play-button" @onclick="TogglePauseAsync" disabled="@(Player.CurrentTrack is null)"
                         title="@(Player.IsPlaying ? "Pause" : "Wiedergabe")"
                         aria-label="@(Player.IsPlaying ? "Pause" : "Wiedergabe")">
-                    @(Player.IsPlaying ? "\u23F8\uFE0E" : "\u25B6\uFE0E")
+                    @if (Player.IsPlaying)
+                    {
+                        <svg class="pause-icon" viewBox="0 0 24 24" width="1em" height="1em"
+                             fill="currentColor" aria-hidden="true" focusable="false"
+                             style="vertical-align: -0.125em;">
+                            <rect x="5" y="4" width="5" height="16" rx="1" />
+                            <rect x="14" y="4" width="5" height="16" rx="1" />
+                        </svg>
+                    }
+                    else
+                    {
+                        <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor"
+                             aria-hidden="true" focusable="false" style="vertical-align: -0.125em;">
+                            <path d="M6 4.5v15a.8.8 0 0 0 1.2.7l12-7.5a.8.8 0 0 0 0-1.4l-12-7.5A.8.8 0 0 0 6 4.5z" />
+                        </svg>
+                    }
                 </button>
                 <button @onclick="NextAsync" disabled="@(Player.Tracks.Count == 0)"
-                        title="Nächstes" aria-label="Nächstes">&#x23ED;&#xFE0E;</button>
+                        title="Nächstes" aria-label="Nächstes">
+                                            <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor"
+                                                 aria-hidden="true" focusable="false" style="vertical-align: -0.125em;">
+                                                <path d="M4 4.5v15a.8.8 0 0 0 1.2.7l10.3-7.5a.8.8 0 0 0 0-1.4L5.2 3.8A.8.8 0 0 0 4 4.5z" />
+                                                <rect x="17" y="4" width="3" height="16" rx="1" />
+                                            </svg>
+                                        </button>
                 </div>
                 <label class="setting-row setting-inline">
                     <span class="setting-icon"
@@ -204,13 +238,25 @@
     private static string FormatTime(double seconds) =>
         TimeSpan.FromSeconds(Math.Max(0, seconds)).ToString(seconds >= 3600 ? @"h\:mm\:ss" : @"m\:ss");
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         disposed = true;
         Player.StateChanged -= OnPlayerStateChanged;
         if (keyboardReference is not null)
         {
-            _ = Js.InvokeVoidAsync("coverPlayerKeyboard.unregister");
+            try
+            {
+                await Js.InvokeVoidAsync("coverPlayerKeyboard.unregister");
+            }
+            catch (Microsoft.JSInterop.JSDisconnectedException)
+            {
+            }
+            catch (TaskCanceledException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
             keyboardReference.Dispose();
         }
     }
