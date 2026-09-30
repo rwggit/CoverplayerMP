@@ -43,7 +43,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
     public double CrossfadeSeconds
     {
         get => crossfadeSeconds;
-        set => crossfadeSeconds = Math.Clamp(value, 0, 10);
+        set => crossfadeSeconds = Math.Clamp(value, 0, 5);
     }
     public bool IsPlaying { get; private set; }
     public bool IsPaused { get; private set; }

@@ -116,7 +116,7 @@
                           title="Dauer der Überblendung"
                           aria-label="Dauer der Überblendung">↔</span>
                     <span class="setting-value">@Player.CrossfadeSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) s</span>
-                    <input type="range" min="0" max="10" step="0.1"
+                    <input type="range" min="0" max="5" step="0.1"
                            title="Dauer der Überblendung: @Player.CrossfadeSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) Sekunden"
                            value="@Player.CrossfadeSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)"
                            @oninput="OnCrossfadeChanged" />
@@ -347,7 +347,7 @@
         if (coverChanged && !disposed)
         {
             coverChanged = false;
-            var duration = (int)Math.Clamp(Player.CrossfadeSeconds * 1000, 600, 3000);
+            var duration = (int)Math.Round(Math.Max(0.6, Player.CrossfadeSeconds) * 1000);
             try
             {
                 await Js.InvokeVoidAsync("coverTransition.show", coverCanvas, coverUri, duration);
@@ -620,7 +620,7 @@
                 System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture,
                 out var value))
-            Player.CrossfadeSeconds = Math.Clamp(value, 0, 10);
+            Player.CrossfadeSeconds = Math.Clamp(value, 0, 5);
     }
 
     private void OnVolumeChanged(ChangeEventArgs args)

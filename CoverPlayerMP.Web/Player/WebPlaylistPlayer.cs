@@ -31,7 +31,7 @@ public sealed class WebPlaylistPlayer(IJSRuntime js) : IPlaylistPlayer
             StateChanged?.Invoke(this, EventArgs.Empty);
         }
     }
-    public double CrossfadeSeconds { get => crossfadeSeconds; set => crossfadeSeconds = Math.Clamp(value, 0, 10); }
+    public double CrossfadeSeconds { get => crossfadeSeconds; set => crossfadeSeconds = Math.Clamp(value, 0, 5); }
     public bool IsPlaying => isPlaying;
     public bool IsPaused => isPaused;
     public string? ErrorMessage => null;
