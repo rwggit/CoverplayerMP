@@ -155,6 +155,45 @@ public static class TrackMetadata
         return result;
     }
 
+    public static IReadOnlyList<KeyValuePair<string, string>> ReadPictures(string? path)
+    {
+        var result = new List<KeyValuePair<string, string>>();
+        if (string.IsNullOrWhiteSpace(path))
+            return result;
+
+        try
+        {
+            using var file = TagLib.File.Create(path);
+            foreach (var picture in file.Tag.Pictures)
+            {
+                var data = picture.Data?.Data;
+                if (data is null || data.Length == 0)
+                    continue;
+
+                var mime = string.IsNullOrWhiteSpace(picture.MimeType) ? "image/jpeg" : picture.MimeType;
+                var resolution = string.Empty;
+                try
+                {
+                    using var codec = SkiaSharp.SKCodec.Create(new MemoryStream(data));
+                    if (codec is not null)
+                        resolution = $"{codec.Info.Width} × {codec.Info.Height} px, ";
+                }
+                catch (Exception)
+                {
+                }
+                var caption = $"{picture.Type}, {mime}, {resolution}{data.Length / 1024d:0.0} KB";
+                if (!string.IsNullOrWhiteSpace(picture.Description))
+                    caption = $"{picture.Description} ({caption})";
+                result.Add(new(caption, $"data:{mime};base64,{Convert.ToBase64String(data)}"));
+            }
+        }
+        catch (Exception)
+        {
+        }
+
+        return result;
+    }
+
     private static string DescribeFrame(TagLib.Id3v2.Frame frame)
     {
         var id = frame.FrameId.ToString();

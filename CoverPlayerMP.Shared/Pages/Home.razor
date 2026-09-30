@@ -214,6 +214,11 @@
                                 <button class="info-button info-inline" title="Inhalt der Tags" aria-label="Inhalt der Tags"
                                         @onclick="ShowRawTags">i</button>
                             }
+                            @if (entry.Key == "Cover-Bilder")
+                            {
+                                <button class="info-button info-inline" title="Cover-Bilder anzeigen" aria-label="Cover-Bilder anzeigen"
+                                        @onclick="ShowPictures">i</button>
+                            }
                         </dd>
                     }
                 </dl>
@@ -240,6 +245,30 @@
                         <dd>@entry.Value</dd>
                     }
                 </dl>
+            </section>
+        </div>
+    }
+    @if (pictures is not null)
+    {
+        <div class="insert-overlay" @onclick="ClosePictures" @onclick:stopPropagation="true">
+            <section class="info-dialog" @onclick:stopPropagation="true">
+                <div class="control-dialog-header">
+                    <span>Cover-Bilder</span>
+                    <button class="close-button" title="Schließen" @onclick="ClosePictures">×</button>
+                </div>
+                <div class="picture-list">
+                    @if (pictures.Count == 0)
+                    {
+                        <span>Keine Cover-Bilder vorhanden.</span>
+                    }
+                    @foreach (var picture in pictures)
+                    {
+                        <figure>
+                            <img src="@picture.Value" alt="@picture.Key" />
+                            <figcaption>@picture.Key</figcaption>
+                        </figure>
+                    }
+                </div>
             </section>
         </div>
     }
@@ -273,8 +302,19 @@
 
     private void CloseRawTags() => rawTags = null;
 
+    private IReadOnlyList<KeyValuePair<string, string>>? pictures;
+
+    private void ShowPictures() => pictures = TrackMetadata.ReadPictures(Player.CurrentTrack?.Source);
+
+    private void ClosePictures() => pictures = null;
+
     private bool HandleBack()
     {
+        if (pictures is not null)
+        {
+            _ = InvokeAsync(() => { pictures = null; StateHasChanged(); });
+            return true;
+        }
         if (rawTags is not null)
         {
             _ = InvokeAsync(() => { rawTags = null; StateHasChanged(); });
