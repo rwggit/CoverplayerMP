@@ -17,6 +17,7 @@ public static class MauiProgram
             });
 
         builder.Services.AddMauiBlazorWebView();
+        builder.Services.AddSingleton<CoverPlayerMP.Shared.Localization.AppText>();
         builder.Services.AddSingleton<IPlaylistPlayer, MauiPlaylistPlayer>();
 
 #if DEBUG

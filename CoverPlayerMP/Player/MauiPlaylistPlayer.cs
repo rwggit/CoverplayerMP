@@ -1,9 +1,10 @@
 ﻿using Plugin.Maui.Audio;
 using CoverPlayerMP.Shared.Player;
+using CoverPlayerMP.Shared.Localization;
 
 namespace CoverPlayerMP.Player;
 
-public sealed class MauiPlaylistPlayer : IPlaylistPlayer
+public sealed class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer
 {
     private readonly IAudioManager audioManager = AudioManager.Current;
     private IAudioPlayer? audioPlayer;
@@ -60,7 +61,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
 #if ANDROID
         if (await Permissions.RequestAsync<CoverPlayerMP.Platforms.Android.ReadMediaAudioPermission>() != PermissionStatus.Granted)
         {
-            SetError("Ohne Berechtigung für Audiodateien können die Titel nicht gelesen werden.");
+            SetError(text.ErrorNoAudioPermission);
             return;
         }
 
@@ -73,7 +74,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
             var path = CoverPlayerMP.Platforms.Android.PlaylistDocumentPicker.GetPhysicalPath(Platform.AppContext, uri);
             if (string.IsNullOrEmpty(path) || !File.Exists(path))
             {
-                SetError($"Der Speicherort der Playlist konnte nicht ermittelt werden: {uri}");
+                SetError(text.ErrorPlaylistLocation(uri.ToString()));
                 return;
             }
 
@@ -84,12 +85,12 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            SetError($"Playlist konnte nicht geöffnet werden: {ex.Message}");
+            SetError(text.ErrorOpenPlaylist(ex.Message));
         }
 #else
         var result = await FilePicker.Default.PickAsync(new PickOptions
         {
-            PickerTitle = "M3U-Playlist auswählen",
+            PickerTitle = text.PickPlaylistTitle,
             FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
             {
                 [DevicePlatform.WinUI] = [".m3u", ".m3u8"],
@@ -118,7 +119,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            SetError($"Playlist konnte nicht geöffnet werden: {ex.Message}");
+            SetError(text.ErrorOpenPlaylist(ex.Message));
         }
 #endif
     }
@@ -137,14 +138,14 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
             IsPlaylistModified = false;
             currentIndex = -1;
             failedTransitionIndex = null;
-            ErrorMessage = tracks.Count == 0 ? "Die Playlist enthält keine abspielbaren Titel." : null;
+            ErrorMessage = tracks.Count == 0 ? text.ErrorEmptyPlaylist : null;
             RaiseStateChanged();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
             tracks = [];
             currentIndex = -1;
-            SetError($"Playlist konnte nicht gelesen werden: {ex.Message}");
+            SetError(text.ErrorReadPlaylist(ex.Message));
         }
     }
 
@@ -201,7 +202,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentOutOfRangeException)
         {
-            SetError($"Die Abspielposition konnte nicht geändert werden: {ex.Message}");
+            SetError(text.ErrorSeek(ex.Message));
             return Task.CompletedTask;
         }
 
@@ -224,7 +225,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
 #if ANDROID
             if (await Permissions.RequestAsync<CoverPlayerMP.Platforms.Android.ReadMediaAudioPermission>() != PermissionStatus.Granted)
             {
-                SetError("Ohne Berechtigung für Audiodateien können die Titel nicht gelesen werden.");
+                SetError(text.ErrorNoAudioPermission);
                 return [];
             }
 
@@ -235,7 +236,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            SetError($"Audiodateien konnten nicht gelesen werden: {ex.Message}");
+            SetError(text.ErrorReadAudioFiles(ex.Message));
             return [];
         }
     }
@@ -441,7 +442,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            SetError($"Playlist konnte nicht gespeichert werden: {ex.Message}");
+            SetError(text.ErrorSavePlaylist(ex.Message));
             return null;
         }
     }
@@ -493,7 +494,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
     {
         var source = tracks[index].Source;
         if (!File.Exists(source))
-            throw new FileNotFoundException($"Audiodatei nicht gefunden: {source}", source);
+            throw new FileNotFoundException(text.ErrorFileNotFound(source), source);
 
         var next = await CreatePlayerAsync(source, cancellationToken);
 
@@ -580,11 +581,11 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
                 var name = string.IsNullOrWhiteSpace(track.Title)
                     ? Path.GetFileName(track.Source)
                     : track.Title;
-                SetError($"„{name}“ kann nicht abgespielt werden: {ex.Message}");
+                SetError(text.ErrorCannotPlay(name, ex.Message));
             }
             else
             {
-                SetError($"Übergang konnte nicht ausgeführt werden: {ex.Message}");
+                SetError(text.ErrorTransition(ex.Message));
             }
         }
         finally
@@ -640,7 +641,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
         }
         catch (Exception ex)
         {
-            SetError($"Playerüberwachung fehlgeschlagen: {ex.Message}");
+            SetError(text.ErrorMonitor(ex.Message));
         }
         finally
         {
@@ -662,7 +663,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
 
         var nextSource = tracks[nextIndex].Source;
         if (!File.Exists(nextSource))
-            throw new FileNotFoundException($"Audiodatei nicht gefunden: {nextSource}", nextSource);
+            throw new FileNotFoundException(text.ErrorFileNotFound(nextSource), nextSource);
 
         var next = await CreatePlayerAsync(nextSource, token);
         next.Volume = 0;

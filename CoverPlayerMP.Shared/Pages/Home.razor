@@ -2,6 +2,7 @@
 @implements IAsyncDisposable
 @inject IPlaylistPlayer Player
 @inject IJSRuntime Js
+@inject AppText Text
 
 <PageTitle>CoverPlayerMP</PageTitle>
 
@@ -24,10 +25,10 @@
     <div class="track-caption">
         <span>@(Player.CurrentTrack?.Artist ?? "CoverPlayerMP")</span>
         <span class="caption-separator">—</span>
-        <span>@(Player.CurrentTrack?.Title ?? "Playlist auswählen")</span>
+        <span>@(Player.CurrentTrack?.Title ?? Text.SelectPlaylist)</span>
         @if (Player.CurrentTrack is not null)
         {
-            <button class="info-button" title="Details zum Lied" aria-label="Details zum Lied"
+            <button class="info-button" title="@Text.TrackDetails" aria-label="@Text.TrackDetails"
                     @onclick="ShowTrackInfo" @onclick:stopPropagation="true">i</button>
         }
     </div>
@@ -36,13 +37,13 @@
     {
         <section class="control-dialog" @onclick:stopPropagation="true">
             <div class="control-dialog-header">
-                <span>Player-Steuerung</span>
-                <button class="close-button" title="Einstellungen" aria-label="Einstellungen" @onclick="OpenOptions">
+                <span>@Text.PlayerControls</span>
+                <button class="close-button" title="@Text.Settings" aria-label="@Text.Settings" @onclick="OpenOptions">
                     <svg viewBox="0 0 24 24" width="0.8em" height="0.8em" fill="currentColor" aria-hidden="true" focusable="false">
                         <path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6a.5.5 0 0 0 .1-.6l-2-3.5a.5.5 0 0 0-.6-.2l-2.5 1a7.3 7.3 0 0 0-1.7-1l-.4-2.6a.5.5 0 0 0-.5-.4h-4a.5.5 0 0 0-.5.4l-.4 2.6a7.3 7.3 0 0 0-1.7 1l-2.5-1a.5.5 0 0 0-.6.2l-2 3.5a.5.5 0 0 0 .1.6L4.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6a.5.5 0 0 0-.1.6l2 3.5a.5.5 0 0 0 .6.2l2.5-1a7.3 7.3 0 0 0 1.7 1l.4 2.6a.5.5 0 0 0 .5.4h4a.5.5 0 0 0 .5-.4l.4-2.6a7.3 7.3 0 0 0 1.7-1l2.5 1a.5.5 0 0 0 .6-.2l2-3.5a.5.5 0 0 0-.1-.6zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" />
                     </svg>
                 </button>
-                <button class="close-button" title="Steuerung ausblenden" aria-label="Steuerung ausblenden" @onclick="HideControls">×</button>
+                <button class="close-button" title="@Text.HideControls" aria-label="@Text.HideControls" @onclick="HideControls">×</button>
             </div>
             <div class="control-row timeline-row">
                 <span>@FormatTime(displayPosition)</span>
@@ -62,7 +63,7 @@
                 <div class="control-buttons">
                 <div class="playlist-buttons">
                 <button @onclick="OpenPlaylistAsync"
-                        title="Playlist öffnen" aria-label="Playlist öffnen">
+                        title="@Text.OpenPlaylist" aria-label="@Text.OpenPlaylist">
                                             <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor"
                                                  aria-hidden="true" focusable="false" style="vertical-align: -0.125em;">
                                                 <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.6l2 2h8.4A1.5 1.5 0 0 1 21 8.5V9H6.2a1.5 1.5 0 0 0-1.4 1L3 15.5z" />
@@ -70,7 +71,7 @@
                                             </svg>
                                         </button>
                 <button @onclick="OpenEditor" disabled="@(Player.Tracks.Count == 0)"
-                        title="Playlist bearbeiten" aria-label="Playlist bearbeiten">
+                        title="@Text.EditPlaylist" aria-label="@Text.EditPlaylist">
                     <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor"
                          aria-hidden="true" focusable="false" style="vertical-align: -0.125em;">
                         <rect x="3" y="5" width="11" height="2" rx="1" />
@@ -80,7 +81,7 @@
                     </svg>
                 </button>
                 <button @onclick="OpenLibraryAsync"
-                        title="Audiodateien suchen" aria-label="Audiodateien suchen">
+                        title="@Text.SearchAudioFiles" aria-label="@Text.SearchAudioFiles">
                     <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor"
                          stroke-width="2.5" stroke-linecap="round"
                          aria-hidden="true" focusable="false" style="vertical-align: -0.125em;">
@@ -89,8 +90,9 @@
                     </svg>
                 </button>
                 </div>
+                <div class="player-buttons">
                 <button @onclick="PreviousAsync" disabled="@(Player.Tracks.Count == 0)"
-                        title="Vorheriges" aria-label="Vorheriges">
+                        title="@Text.Previous" aria-label="@Text.Previous">
                                             <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor"
                                                  aria-hidden="true" focusable="false" style="vertical-align: -0.125em;">
                                                 <rect x="4" y="4" width="3" height="16" rx="1" />
@@ -98,10 +100,10 @@
                                             </svg>
                                         </button>
                 <button @onclick="RestartAsync" disabled="@(Player.CurrentTrack is null)"
-                        title="Anfang" aria-label="Anfang">&#x21BA;&#xFE0E;</button>
+                        title="@Text.Restart" aria-label="@Text.Restart">&#x21BA;&#xFE0E;</button>
                 <button class="play-button" @onclick="TogglePauseAsync" disabled="@(Player.CurrentTrack is null)"
-                        title="@(Player.IsPlaying ? "Pause" : "Wiedergabe")"
-                        aria-label="@(Player.IsPlaying ? "Pause" : "Wiedergabe")">
+                        title="@(Player.IsPlaying ? Text.Pause : Text.Play)"
+                        aria-label="@(Player.IsPlaying ? Text.Pause : Text.Play)">
                     @if (Player.IsPlaying)
                     {
                         <svg class="pause-icon" viewBox="0 0 24 24" width="1em" height="1em"
@@ -120,7 +122,7 @@
                     }
                 </button>
                 <button @onclick="NextAsync" disabled="@(Player.Tracks.Count == 0)"
-                        title="Nächstes" aria-label="Nächstes">
+                        title="@Text.Next" aria-label="@Text.Next">
                                             <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor"
                                                  aria-hidden="true" focusable="false" style="vertical-align: -0.125em;">
                                                 <path d="M4 4.5v15a.8.8 0 0 0 1.2.7l10.3-7.5a.8.8 0 0 0 0-1.4L5.2 3.8A.8.8 0 0 0 4 4.5z" />
@@ -128,13 +130,14 @@
                                             </svg>
                                         </button>
                 </div>
+                </div>
                 <label class="setting-row setting-inline">
                     <span class="setting-icon"
-                          title="Lautstärke:
-                          aria-label="Lautstärke">🔊</span>
+                           title="@Text.Volume"
+                           aria-label="@Text.Volume">🔊</span>
                     <span class="setting-value">@Math.Round(Player.Volume * 100) %</span>
                     <input type="range" min="0" max="1" step="0.01"
-                           title="Lautstärke: @Math.Round(Player.Volume * 100) Prozent"
+                           title="@Text.VolumePercent(Math.Round(Player.Volume * 100))"
                            value="@Player.Volume.ToString(System.Globalization.CultureInfo.InvariantCulture)"
                            @oninput="OnVolumeChanged" />
                 </label>
@@ -146,12 +149,12 @@
     {
         <section class="library-dialog" @onclick:stopPropagation="true">
             <div class="control-dialog-header">
-                <span>Audiodateien (@FilteredLibrary.Count() von @libraryTracks.Count)</span>
-                <button class="close-button" title="Schließen" @onclick="CloseLibrary">×</button>
+                <span>@Text.AudioFiles (@FilteredLibrary.Count() @Text.Of @libraryTracks.Count)</span>
+                <button class="close-button" title="@Text.Close" @onclick="CloseLibrary">×</button>
             </div>
             @if (libraryLoading)
             {
-                <div class="library-status">Audiodateien werden gelesen …</div>
+                <div class="library-status">@Text.ReadingAudioFiles</div>
             }
             else
             {
@@ -159,14 +162,14 @@
                     <table class="library-table">
                         <thead>
                             <tr>
-                                <th><input placeholder="Interpret" @bind="artistFilter" @bind:event="oninput" /></th>
-                                <th><input placeholder="Titel" @bind="titleFilter" @bind:event="oninput" /></th>
-                                <th><input placeholder="z.B. >3:00" @bind="durationFilter" @bind:event="oninput" /></th>
+                                <th><input placeholder="@Text.Artist" @bind="artistFilter" @bind:event="oninput" /></th>
+                                <th><input placeholder="@Text.Title" @bind="titleFilter" @bind:event="oninput" /></th>
+                                <th><input placeholder="@Text.DurationFilterPlaceholder" @bind="durationFilter" @bind:event="oninput" /></th>
                             </tr>
                             <tr>
-                                <th class="sortable" @onclick="() => SortBy(LibrarySortColumn.Artist)">Interpret@(SortIndicator(LibrarySortColumn.Artist))</th>
-                                <th class="sortable" @onclick="() => SortBy(LibrarySortColumn.Title)">Titel@(SortIndicator(LibrarySortColumn.Title))</th>
-                                <th class="sortable" @onclick="() => SortBy(LibrarySortColumn.Duration)">Dauer@(SortIndicator(LibrarySortColumn.Duration))</th>
+                                <th class="sortable" @onclick="() => SortBy(LibrarySortColumn.Artist)">@Text.Artist@(SortIndicator(LibrarySortColumn.Artist))</th>
+                                <th class="sortable" @onclick="() => SortBy(LibrarySortColumn.Title)">@Text.Title@(SortIndicator(LibrarySortColumn.Title))</th>
+                                <th class="sortable" @onclick="() => SortBy(LibrarySortColumn.Duration)">@Text.Duration@(SortIndicator(LibrarySortColumn.Duration))</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -189,30 +192,30 @@
     {
         <section class="library-dialog" style="--editor-cover-size: @(editorCoverSize)rem;" @onclick:stopPropagation="true">
             <div class="control-dialog-header">
-                <span>Playlist bearbeiten (@FilteredPlaylist.Count() von @Player.Tracks.Count)</span>
-                <button class="close-button" title="Schließen" @onclick="CloseEditor">×</button>
+                <span>@Text.EditPlaylist (@FilteredPlaylist.Count() @Text.Of @Player.Tracks.Count)</span>
+                <button class="close-button" title="@Text.Close" @onclick="CloseEditor">×</button>
             </div>
             <div class="editor-toolbar">
-                <input class="editor-search" type="search" placeholder="Suchen …"
+                <input class="editor-search" type="search" placeholder="@Text.Search"
                        @bind="editorSearch" @bind:event="oninput" />
                 <button @onclick="RemoveSelectedTrackAsync" disabled="@(!CanRemoveSelected)"
-                        title="Lied entfernen" aria-label="Lied entfernen">
+                        title="@Text.RemoveTrack" aria-label="@Text.RemoveTrack">
                     <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor"
                          aria-hidden="true" focusable="false" style="vertical-align: -0.125em;">
                         <path d="M9 3h6l1 2h4v2H4V5h4z" />
                         <path d="M6 9h12l-1 11.2a1 1 0 0 1-1 .8H8a1 1 0 0 1-1-.8z" />
                     </svg>
                 </button>
-                <button @onclick="OpenLibraryAsync" title="Lied hinzufügen" aria-label="Lied hinzufügen">+</button>
+                <button @onclick="OpenLibraryAsync" title="@Text.AddTrack" aria-label="@Text.AddTrack">+</button>
                 <button @onclick="ShowSelectedTrackInfo" disabled="@(SelectedTrack is null)"
-                        title="Details zum Lied" aria-label="Details zum Lied">i</button>
+                        title="@Text.TrackDetails" aria-label="@Text.TrackDetails">i</button>
             </div>
             @if (selectionMode)
             {
                 <div class="selection-toolbar">
-                    <span>@selectedIndices.Count ausgewählt</span>
-                    <button @onclick="SelectAllVisible" title="Alle auswählen" aria-label="Alle auswählen">Alle</button>
-                    <button @onclick="EndSelectionMode" title="Auswahl beenden" aria-label="Auswahl beenden">×</button>
+                    <span>@Text.Selected(selectedIndices.Count)</span>
+                    <button @onclick="SelectAllVisible" title="@Text.SelectAll" aria-label="@Text.SelectAll">@Text.All</button>
+                    <button @onclick="EndSelectionMode" title="@Text.EndSelection" aria-label="@Text.EndSelection">×</button>
                 </div>
             }
             <div class="library-table-wrapper">
@@ -224,10 +227,10 @@
                             {
                                 <th class="editor-check-cell"></th>
                             }
-                            <th class="sortable" @onclick="() => EditorSortBy(EditorSortColumn.Position)">Nr.@(EditorSortIndicator(EditorSortColumn.Position))</th>
-                            <th class="sortable" @onclick="() => EditorSortBy(EditorSortColumn.Artist)">Interpret@(EditorSortIndicator(EditorSortColumn.Artist))</th>
-                            <th class="sortable" @onclick="() => EditorSortBy(EditorSortColumn.Title)">Titel@(EditorSortIndicator(EditorSortColumn.Title))</th>
-                            <th>Cover</th>
+                            <th class="sortable" @onclick="() => EditorSortBy(EditorSortColumn.Position)">@Text.No@(EditorSortIndicator(EditorSortColumn.Position))</th>
+                            <th class="sortable" @onclick="() => EditorSortBy(EditorSortColumn.Artist)">@Text.Artist@(EditorSortIndicator(EditorSortColumn.Artist))</th>
+                            <th class="sortable" @onclick="() => EditorSortBy(EditorSortColumn.Title)">@Text.Title@(EditorSortIndicator(EditorSortColumn.Title))</th>
+                            <th>@Text.Cover</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -246,7 +249,7 @@
                                 @ondrop="() => DropTrack(index)">
                                 <td class="editor-grip-cell">
                                     <span class="editor-grip" draggable="@(editingIndex is null ? "true" : "false")"
-                                          title="Verschieben" aria-label="Verschieben"
+                                           title="@Text.Move" aria-label="@Text.Move"
                                           @onpointerdown:stopPropagation="true"
                                           @onclick:stopPropagation="true"
                                           @ondragstart="() => BeginDrag(index)"
@@ -256,7 +259,7 @@
                                 {
                                     <td class="editor-check-cell">
                                         <input type="checkbox" checked="@selectedIndices.Contains(index)" tabindex="-1"
-                                               aria-label="Auswählen" style="pointer-events: none;" />
+                                               aria-label="@Text.Select" style="pointer-events: none;" />
                                     </td>
                                 }
                                 <td class="editor-position" @onclick="() => { if (!selectionMode) BeginEditPosition(index); }">
@@ -275,7 +278,7 @@
                                 <td>@track.Artist</td>
                                 <td>@track.Title</td>
                                 <td class="editor-cover-cell">
-                                    <button class="editor-cover" title="Abspielen" aria-label="Abspielen"
+                                    <button class="editor-cover" title="@Text.PlayTrack" aria-label="@Text.PlayTrack"
                                             @onclick="() => PlayFromEditorAsync(index)">
                                         @if (details.Cover is not null)
                                         {
@@ -309,7 +312,7 @@
         <div class="insert-overlay busy-overlay" @onclick:stopPropagation="true">
             <section class="insert-dialog" role="alertdialog" aria-live="assertive">
                 <span class="busy-spinner" aria-hidden="true"></span>
-                <span>@removingTrack entfernt …</span>
+                <span>@removingTrack</span>
             </section>
         </div>
     }
@@ -319,14 +322,14 @@
         <div class="insert-overlay" @onclick:stopPropagation="true">
             <section class="insert-dialog">
                 <div class="control-dialog-header">
-                    <span>„@pendingTrack.Title“ einfügen</span>
-                    <button class="close-button" title="Abbrechen" @onclick="() => pendingTrack = null">×</button>
+                    <span>@Text.InsertTrack(pendingTrack.Title)</span>
+                    <button class="close-button" title="@Text.Cancel" @onclick="() => pendingTrack = null">×</button>
                 </div>
-                <button @onclick="() => InsertPendingAsync(TrackInsertPosition.Start)">Am Anfang der Playlist</button>
-                <button @onclick="() => InsertPendingAsync(TrackInsertPosition.BeforeCurrent)">Vor dem aktuellen Lied</button>
-                <button @onclick="() => InsertPendingAsync(TrackInsertPosition.AfterCurrent)">Hinter dem aktuellen Lied</button>
-                <button @onclick="() => InsertPendingAsync(TrackInsertPosition.AfterCurrentAndPlay)">Hinter dem aktuellen Lied und sofort abspielen</button>
-                <button @onclick="() => InsertPendingAsync(TrackInsertPosition.End)">Am Ende der Playlist</button>
+                <button @onclick="() => InsertPendingAsync(TrackInsertPosition.Start)">@Text.InsertAtStart</button>
+                <button @onclick="() => InsertPendingAsync(TrackInsertPosition.BeforeCurrent)">@Text.InsertBeforeCurrent</button>
+                <button @onclick="() => InsertPendingAsync(TrackInsertPosition.AfterCurrent)">@Text.InsertAfterCurrent</button>
+                <button @onclick="() => InsertPendingAsync(TrackInsertPosition.AfterCurrentAndPlay)">@Text.InsertAfterCurrentAndPlay</button>
+                <button @onclick="() => InsertPendingAsync(TrackInsertPosition.End)">@Text.InsertAtEnd</button>
             </section>
         </div>
     }
@@ -336,8 +339,8 @@
         <div class="insert-overlay" @onclick="CloseTrackInfo" @onclick:stopPropagation="true">
             <section class="info-dialog" @onclick:stopPropagation="true">
                 <div class="control-dialog-header">
-                    <span>Details zum Lied</span>
-                    <button class="close-button" title="Schließen" @onclick="CloseTrackInfo">×</button>
+                    <span>@Text.TrackDetails</span>
+                    <button class="close-button" title="@Text.Close" @onclick="CloseTrackInfo">×</button>
                 </div>
                 <dl class="info-list">
                     @foreach (var entry in trackInfo)
@@ -345,14 +348,14 @@
                         <dt>@entry.Key</dt>
                         <dd>
                             @entry.Value
-                            @if (entry.Key == "Tag-Typen")
+                            @if (entry.Key == Text.MetaTagTypes)
                             {
-                                <button class="info-button info-inline" title="Inhalt der Tags" aria-label="Inhalt der Tags"
+                                <button class="info-button info-inline" title="@Text.TagContents" aria-label="@Text.TagContents"
                                         @onclick="ShowRawTags">i</button>
                             }
-                            @if (entry.Key == "Cover-Bilder")
+                            @if (entry.Key == Text.CoverPictures)
                             {
-                                <button class="info-button info-inline" title="Cover-Bilder anzeigen" aria-label="Cover-Bilder anzeigen"
+                                <button class="info-button info-inline" title="@Text.ShowCoverPictures" aria-label="@Text.ShowCoverPictures"
                                         @onclick="ShowPictures">i</button>
                             }
                         </dd>
@@ -367,13 +370,13 @@
         <div class="insert-overlay" @onclick="CloseRawTags" @onclick:stopPropagation="true">
             <section class="info-dialog" @onclick:stopPropagation="true">
                 <div class="control-dialog-header">
-                    <span>Inhalt der Tags</span>
-                    <button class="close-button" title="Schließen" @onclick="CloseRawTags">×</button>
+                    <span>@Text.TagContents</span>
+                    <button class="close-button" title="@Text.Close" @onclick="CloseRawTags">×</button>
                 </div>
                 <dl class="info-list">
                     @if (rawTags.Count == 0)
                     {
-                        <dd>Keine Tags vorhanden.</dd>
+                        <dd>@Text.NoTags</dd>
                     }
                     @foreach (var entry in rawTags)
                     {
@@ -389,13 +392,13 @@
         <div class="insert-overlay" @onclick="ClosePictures" @onclick:stopPropagation="true">
             <section class="info-dialog" @onclick:stopPropagation="true">
                 <div class="control-dialog-header">
-                    <span>Cover-Bilder</span>
-                    <button class="close-button" title="Schließen" @onclick="ClosePictures">×</button>
+                    <span>@Text.CoverPictures</span>
+                    <button class="close-button" title="@Text.Close" @onclick="ClosePictures">×</button>
                 </div>
                 <div class="picture-list">
                     @if (pictures.Count == 0)
                     {
-                        <span>Keine Cover-Bilder vorhanden.</span>
+                        <span>@Text.NoCoverPictures</span>
                     }
                     @foreach (var picture in pictures)
                     {
@@ -413,43 +416,52 @@
         <div class="insert-overlay" @onclick="CloseOptions" @onclick:stopPropagation="true">
             <section class="insert-dialog" @onclick:stopPropagation="true">
                 <div class="control-dialog-header">
-                    <span>Einstellungen</span>
-                    <button class="close-button" title="Schließen" @onclick="CloseOptions">×</button>
+                    <span>@Text.Settings</span>
+                    <button class="close-button" title="@Text.Close" @onclick="CloseOptions">×</button>
                 </div>
                 @if (!quitConfirmVisible)
                 {
                     <label class="setting-row">
-                        <span>Überblendung</span>
+                        <span>@Text.Crossfade</span>
                         <input type="range" min="0" max="5" step="0.1"
-                               title="Dauer der Überblendung: @Player.CrossfadeSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) Sekunden"
+                               title="@Text.CrossfadeTooltip(Player.CrossfadeSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))"
                                value="@Player.CrossfadeSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)"
                                @oninput="OnCrossfadeChanged" />
                         <span class="setting-value">@Player.CrossfadeSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) s</span>
                     </label>
                     <label class="setting-row">
-                        <span>Cover-Größe</span>
+                        <span>@Text.CoverSize</span>
                         <input type="range" min="3" max="12" step="1"
-                               title="Größe der Cover in der Playlistbearbeitung: @editorCoverSize rem"
+                               title="@Text.CoverSizeTooltip(editorCoverSize)"
                                value="@editorCoverSize"
                                @oninput="OnEditorCoverSizeChanged" />
                         <span class="setting-value">@editorCoverSize rem</span>
                     </label>
-                    <button @onclick="OpenAnimationsAsync">Animationen</button>
+                    <label class="setting-row">
+                        <span>@Text.LanguageLabel</span>
+                        <select value="@Text.Language" @onchange="OnLanguageChanged">
+                            <option value="@AppLanguage.Auto">@Text.LanguageAuto</option>
+                            <option value="@AppLanguage.German">Deutsch</option>
+                            <option value="@AppLanguage.English">English</option>
+                            <option value="@AppLanguage.French">Français</option>
+                        </select>
+                    </label>
+                    <button @onclick="OpenAnimationsAsync">@Text.Animations</button>
                     @if (Player.CanQuit)
                     {
-                        <button @onclick="RequestQuit">CoverplayerMP beenden</button>
+                        <button @onclick="RequestQuit">@Text.QuitApp</button>
                     }
                     else if (Player.IsPlaylistModified)
                     {
-                        <button @onclick="SaveOnlyAsync">Playlist speichern</button>
+                        <button @onclick="SaveOnlyAsync">@Text.SavePlaylist</button>
                     }
                 }
                 else
                 {
-                    <span>Die Playlist wurde verändert. Soll sie vor dem Beenden gespeichert werden?</span>
-                    <button @onclick="() => QuitAsync(true)">Speichern und beenden</button>
-                    <button @onclick="() => QuitAsync(false)">Ohne Speichern beenden</button>
-                    <button @onclick="() => quitConfirmVisible = false">Abbrechen</button>
+                    <span>@Text.SaveBeforeQuit</span>
+                    <button @onclick="() => QuitAsync(true)">@Text.SaveAndQuit</button>
+                    <button @onclick="() => QuitAsync(false)">@Text.QuitWithoutSaving</button>
+                    <button @onclick="() => quitConfirmVisible = false">@Text.Cancel</button>
                 }
             </section>
         </div>
@@ -459,12 +471,12 @@
         <div class="insert-overlay" @onclick="CloseAnimations" @onclick:stopPropagation="true">
             <section class="info-dialog" @onclick:stopPropagation="true">
                 <div class="control-dialog-header">
-                    <span>Animationen (@animationChoices.Count(a => a.Active) von @animationChoices.Count)</span>
-                    <button class="close-button" title="Schließen" @onclick="CloseAnimations">×</button>
+                    <span>@Text.Animations (@animationChoices.Count(a => a.Active) @Text.Of @animationChoices.Count)</span>
+                    <button class="close-button" title="@Text.Close" @onclick="CloseAnimations">×</button>
                 </div>
                 <div class="animation-toolbar">
-                    <button @onclick="() => SetAllAnimations(true)">Alle</button>
-                    <button @onclick="() => SetAllAnimations(false)">Keine</button>
+                    <button @onclick="() => SetAllAnimations(true)">@Text.All</button>
+                    <button @onclick="() => SetAllAnimations(false)">@Text.None</button>
                 </div>
                 <div class="animation-list">
                     @foreach (var group in animationChoices.GroupBy(a => a.Group))
@@ -484,8 +496,8 @@
                     }
                 </div>
                 <div class="animation-toolbar">
-                    <button class="play-button" @onclick="SaveAnimationsAsync">Übernehmen</button>
-                    <button @onclick="CloseAnimations">Abbrechen</button>
+                    <button class="play-button" @onclick="SaveAnimationsAsync">@Text.Apply</button>
+                    <button @onclick="CloseAnimations">@Text.Cancel</button>
                 </div>
             </section>
         </div>
@@ -508,6 +520,7 @@
     protected override void OnInitialized()
     {
         Player.StateChanged += OnPlayerStateChanged;
+        Text.LanguageChanged += OnLanguageChangedEvent;
         BackNavigation.Handler = HandleBack;
     }
 
@@ -519,14 +532,14 @@
     private void ShowTrackInfo(Track? track)
     {
         infoSource = track?.Source;
-        trackInfo = TrackMetadata.Read(infoSource);
+        trackInfo = TrackMetadata.Read(infoSource, Text);
     }
 
     private void CloseTrackInfo() => trackInfo = null;
 
     private IReadOnlyList<KeyValuePair<string, string>>? rawTags;
 
-    private void ShowRawTags() => rawTags = TrackMetadata.ReadRawTags(infoSource);
+    private void ShowRawTags() => rawTags = TrackMetadata.ReadRawTags(infoSource, Text);
 
     private void CloseRawTags() => rawTags = null;
 
@@ -590,7 +603,7 @@
     {
         try
         {
-            animationChoices = (await Js.InvokeAsync<AnimationChoice[]>("coverTransition.getAnimations")).ToList();
+            animationChoices = (await Js.InvokeAsync<AnimationChoice[]>("coverTransition.getAnimations", Text.Code)).ToList();
         }
         catch (JSException)
         {
@@ -703,6 +716,35 @@
 
     private const string CrossfadeKey = "coverPlayer.crossfadeSeconds";
     private const string EditorCoverSizeKey = "coverPlayer.editorCoverSize";
+    private const string LanguageKey = "coverPlayer.language";
+
+    private async Task OnLanguageChanged(ChangeEventArgs args)
+    {
+        if (Enum.TryParse<AppLanguage>(args.Value?.ToString(), out var language))
+        {
+            Text.Language = language;
+            await SaveSettingAsync(LanguageKey, language.ToString());
+        }
+    }
+
+    private void OnLanguageChangedEvent(object? sender, EventArgs e)
+    {
+        if (infoSource is not null && trackInfo is not null)
+            trackInfo = TrackMetadata.Read(infoSource, Text);
+        if (infoSource is not null && rawTags is not null)
+            rawTags = TrackMetadata.ReadRawTags(infoSource, Text);
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                await Js.InvokeVoidAsync("document.documentElement.setAttribute", "lang", Text.Code);
+            }
+            catch (JSException)
+            {
+            }
+            StateHasChanged();
+        });
+    }
 
     private async Task LoadSettingsAsync()
     {
@@ -716,6 +758,11 @@
             var coverSize = await Js.InvokeAsync<string?>("localStorage.getItem", EditorCoverSizeKey);
             if (int.TryParse(coverSize, out var size))
                 editorCoverSize = Math.Clamp(size, 3, 12);
+
+            var language = await Js.InvokeAsync<string?>("localStorage.getItem", LanguageKey);
+            if (Enum.TryParse<AppLanguage>(language, out var appLanguage))
+                Text.Language = appLanguage;
+            await Js.InvokeVoidAsync("document.documentElement.setAttribute", "lang", Text.Code);
 
             StateHasChanged();
         }
@@ -1038,11 +1085,11 @@
         if (indices.Count == 1)
         {
             var track = Player.Tracks[indices[0]];
-            removingTrack = "„" + (string.IsNullOrWhiteSpace(track.Title) ? Path.GetFileName(track.Source) : track.Title) + "“ wird";
+            removingTrack = Text.RemovingOne(string.IsNullOrWhiteSpace(track.Title) ? Path.GetFileName(track.Source) : track.Title);
         }
         else
         {
-            removingTrack = $"{indices.Count} Lieder werden";
+            removingTrack = Text.RemovingMany(indices.Count);
         }
         StateHasChanged();
         try
@@ -1387,6 +1434,7 @@
     {
         disposed = true;
         Player.StateChanged -= OnPlayerStateChanged;
+        Text.LanguageChanged -= OnLanguageChangedEvent;
         BackNavigation.Handler = null;
         if (keyboardReference is not null)
         {

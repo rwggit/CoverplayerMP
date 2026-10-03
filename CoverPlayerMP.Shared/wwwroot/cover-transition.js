@@ -546,8 +546,61 @@ window.coverTransition = (() => {
         return { fn: animations[aniIndex], n: subdivisions };
     }
 
-    function getAnimations() {
-        return catalog.map(([name, label, group], i) => ({ name, label, group, active: isActive(i) }));
+    const englishPhrases = [
+        ["Rein/Raus rollen", "Roll in/out"],
+        ["Rollen skalieren", "Roll scaled"],
+        ["Dreiecke fallen", "Falling triangles"],
+        ["Dreiecke Explosion", "Triangle explosion"],
+        ["Dreiecke Implosion", "Triangle implosion"],
+        ["Tauschen links/rechts", "Swap left/right"],
+        ["Tauschen oben/unten", "Swap top/bottom"],
+        ["Zoom oben links", "Zoom top left"],
+        ["Nach unten rechts", "Down right"],
+        ["Nach oben links", "Up left"],
+        ["Hintergrund", "background"],
+        ["skalieren", "scaled"],
+        ["Umkehr", "reverse"],
+        ["Rollen", "Roll"],
+        ["Uhr", "Clock"],
+        ["Drehen", "Rotate"],
+        ["Raute", "Diamond"],
+        ["Schmetterling", "Butterfly"],
+        ["Klassisch", "Classic"]
+    ];
+
+    const frenchPhrases = [
+        ["Rein/Raus rollen", "Rouler entrée/sortie"],
+        ["Rollen skalieren", "Rouler avec échelle"],
+        ["Dreiecke fallen", "Triangles qui tombent"],
+        ["Dreiecke Explosion", "Explosion de triangles"],
+        ["Dreiecke Implosion", "Implosion de triangles"],
+        ["Tauschen links/rechts", "Échange gauche/droite"],
+        ["Tauschen oben/unten", "Échange haut/bas"],
+        ["Zoom oben links", "Zoom en haut à gauche"],
+        ["Nach unten rechts", "Vers le bas à droite"],
+        ["Nach oben links", "Vers le haut à gauche"],
+        ["Hintergrund", "arrière-plan"],
+        ["skalieren", "avec échelle"],
+        ["Umkehr", "inversé"],
+        ["Rollen", "Rouler"],
+        ["Uhr", "Horloge"],
+        ["Drehen", "Rotation"],
+        ["Raute", "Losange"],
+        ["Schmetterling", "Papillon"],
+        ["Klassisch", "Classique"]
+    ];
+
+    function translate(text, lang) {
+        const phrases = lang === "en" ? englishPhrases : lang === "fr" ? frenchPhrases : null;
+        if (!phrases) return text;
+        let result = text;
+        for (const [de, en] of phrases) result = result.split(de).join(en);
+        return result.charAt(0).toUpperCase() + result.slice(1);
+    }
+
+    function getAnimations(lang) {
+        return catalog.map(([name, label, group], i) =>
+            ({ name, label: translate(label, lang), group: translate(group, lang), active: isActive(i) }));
     }
 
     function setActiveAnimations(names) {

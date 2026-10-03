@@ -1,8 +1,10 @@
+﻿using CoverPlayerMP.Shared.Localization;
+
 namespace CoverPlayerMP.Shared.Player;
 
 public static class TrackMetadata
 {
-    public static IReadOnlyList<KeyValuePair<string, string>> Read(string? path)
+    public static IReadOnlyList<KeyValuePair<string, string>> Read(string? path, AppText text)
     {
         var result = new List<KeyValuePair<string, string>>();
         if (string.IsNullOrWhiteSpace(path))
@@ -25,7 +27,7 @@ public static class TrackMetadata
                 result.Add(new(name, text.Trim()));
         }
 
-        Add("Datei", path);
+        Add(text.MetaFile, path);
         FileInfo info;
         try
         {
@@ -35,55 +37,55 @@ public static class TrackMetadata
         }
         catch (Exception ex)
         {
-            Add("Fehler", ex.Message);
+            Add(text.MetaError, ex.Message);
             return result;
         }
 
-        Add("Dateigröße", $"{info.Length / 1024d / 1024d:0.00} MB");
-        Add("Geändert", info.LastWriteTime.ToString("g"));
+        Add(text.MetaFileSize, $"{info.Length / 1024d / 1024d:0.00} MB");
+        Add(text.MetaModified, info.LastWriteTime.ToString("g"));
 
         try
         {
             using var file = TagLib.File.Create(path);
             var tag = file.Tag;
-            Add("Titel", tag.Title);
-            Add("Interpret", tag.Performers);
-            Add("Album-Interpret", tag.AlbumArtists);
-            Add("Album", tag.Album);
-            Add("Jahr", tag.Year);
-            Add("Titelnummer", tag.Track == 0 ? null : tag.TrackCount > 0 ? $"{tag.Track}/{tag.TrackCount}" : tag.Track.ToString());
-            Add("CD", tag.Disc == 0 ? null : tag.DiscCount > 0 ? $"{tag.Disc}/{tag.DiscCount}" : tag.Disc.ToString());
-            Add("Genre", tag.Genres);
-            Add("Komponist", tag.Composers);
-            Add("Dirigent", tag.Conductor);
-            Add("Gruppierung", tag.Grouping);
+            Add(text.Title, tag.Title);
+            Add(text.Artist, tag.Performers);
+            Add(text.MetaAlbumArtist, tag.AlbumArtists);
+            Add(text.MetaAlbum, tag.Album);
+            Add(text.MetaYear, tag.Year);
+            Add(text.MetaTrackNumber, tag.Track == 0 ? null : tag.TrackCount > 0 ? $"{tag.Track}/{tag.TrackCount}" : tag.Track.ToString());
+            Add(text.MetaDisc, tag.Disc == 0 ? null : tag.DiscCount > 0 ? $"{tag.Disc}/{tag.DiscCount}" : tag.Disc.ToString());
+            Add(text.MetaGenre, tag.Genres);
+            Add(text.MetaComposer, tag.Composers);
+            Add(text.MetaConductor, tag.Conductor);
+            Add(text.MetaGrouping, tag.Grouping);
             Add("BPM", tag.BeatsPerMinute);
-            Add("Kommentar", tag.Comment);
+            Add(text.MetaComment, tag.Comment);
             Add("Copyright", tag.Copyright);
-            Add("Liedtext", tag.Lyrics);
-            Add("Cover-Bilder", tag.Pictures.Length);
-            Add("Tag-Typen", file.TagTypes.ToString());
+            Add(text.MetaLyrics, tag.Lyrics);
+            Add(text.CoverPictures, tag.Pictures.Length);
+            Add(text.MetaTagTypes, file.TagTypes.ToString());
 
             var props = file.Properties;
             if (props is not null)
             {
-                Add("Spieldauer", props.Duration);
+                Add(text.MetaDuration, props.Duration);
                 Add("Codec", props.Description);
                 Add("Bitrate", props.AudioBitrate == 0 ? null : $"{props.AudioBitrate} kbit/s");
-                Add("Abtastrate", props.AudioSampleRate == 0 ? null : $"{props.AudioSampleRate} Hz");
-                Add("Kanäle", props.AudioChannels);
-                Add("Bits pro Sample", props.BitsPerSample);
+                Add(text.MetaSampleRate, props.AudioSampleRate == 0 ? null : $"{props.AudioSampleRate} Hz");
+                Add(text.MetaChannels, props.AudioChannels);
+                Add(text.MetaBitsPerSample, props.BitsPerSample);
             }
         }
         catch (Exception ex)
         {
-            Add("Metadaten", $"Nicht lesbar: {ex.Message}");
+            Add(text.MetaMetadata, text.MetaUnreadable(ex.Message));
         }
 
         return result;
     }
 
-    public static IReadOnlyList<KeyValuePair<string, string>> ReadRawTags(string? path)
+    public static IReadOnlyList<KeyValuePair<string, string>> ReadRawTags(string? path, AppText text)
     {
         var result = new List<KeyValuePair<string, string>>();
         if (string.IsNullOrWhiteSpace(path))
@@ -149,7 +151,7 @@ public static class TrackMetadata
         }
         catch (Exception ex)
         {
-            Add("Fehler", ex.Message);
+            Add(text.MetaError, ex.Message);
         }
 
         return result;

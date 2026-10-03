@@ -1,15 +1,17 @@
 ﻿@page "/Error"
 @using System.Diagnostics
+@using CoverPlayerMP.Shared.Localization
+@inject AppText Text
 
-<PageTitle>Error</PageTitle>
+<PageTitle>@Text.PageErrorTitle</PageTitle>
 
-<h1 class="text-danger">Error.</h1>
-<h2 class="text-danger">An error occurred while processing your request.</h2>
+<h1 class="text-danger">@Text.PageErrorHeading</h1>
+<h2 class="text-danger">@Text.PageErrorMessage</h2>
 
 @if (ShowRequestId)
 {
     <p>
-        <strong>Request ID:</strong> <code>@RequestId</code>
+        <strong>@Text.RequestId</strong>
     </p>
 }
 
