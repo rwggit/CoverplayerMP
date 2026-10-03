@@ -316,6 +316,45 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .editor-table thead tr:first-child th { top: 0; }
 .editor-table tbody tr { cursor: default; }
 .editor-table tbody tr.current-row { background: #2a2650; }
+.editor-table tbody tr.selected-row { outline: 2px solid #8a7cff; outline-offset: -2px; }
+.busy-overlay { z-index: 30; cursor: progress; }
+.busy-overlay .insert-dialog { flex-direction: row; align-items: center; gap: .75rem; padding: 1.25rem; }
+.busy-spinner {
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 3px solid #51576d;
+    border-top-color: #8a7cff;
+    border-radius: 50%;
+    animation: busy-spin .8s linear infinite;
+}
+@keyframes busy-spin { to { transform: rotate(360deg); } }
+.editor-table tbody tr.drop-target { box-shadow: inset 0 3px 0 #8a7cff; }
+.editor-table tbody tr { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.editor-table .editor-grip-cell { width: 2rem; padding: 0; text-align: center; }
+.editor-table .editor-check-cell { width: 2rem; padding: 0; text-align: center; }
+.editor-check-cell input { width: 1.1rem; height: 1.1rem; accent-color: #8a7cff; }
+.editor-grip {
+    display: inline-block;
+    padding: .5rem .35rem;
+    font-size: 1.25rem;
+    line-height: 1;
+    color: #8a90a8;
+    cursor: grab;
+    touch-action: none;
+}
+.editor-grip:active { cursor: grabbing; color: #fff; }
+.selection-toolbar {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-bottom: .5rem;
+    padding: .35rem .6rem;
+    border-radius: .4rem;
+    background: #2a2650;
+}
+.selection-toolbar span { flex: 1; }
+.editor-toolbar { display: flex; gap: .5rem; align-items: center; margin-bottom: .5rem; }
+.editor-toolbar .editor-search { flex: 1; margin-bottom: 0; }
 .editor-table td.editor-position { width: 4rem; cursor: pointer; font-variant-numeric: tabular-nums; }
 .editor-table td.editor-position input {
     width: 3.5rem;

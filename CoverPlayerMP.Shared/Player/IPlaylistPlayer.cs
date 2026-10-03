@@ -27,6 +27,7 @@ public interface IPlaylistPlayer : IAsyncDisposable
     Task InsertTrackAsync(Track track, TrackInsertPosition position, CancellationToken cancellationToken = default);
     Task PlayWithCrossfadeAsync(int index, CancellationToken cancellationToken = default);
     void MoveTrack(int fromIndex, int toIndex);
+    Task RemoveTrackAsync(int index, CancellationToken cancellationToken = default);
     bool IsPlaylistModified { get; }
     bool CanQuit { get; }
     Task<string?> SavePlaylistAsync(CancellationToken cancellationToken = default);

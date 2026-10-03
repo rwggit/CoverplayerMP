@@ -156,6 +156,35 @@ public sealed class WebPlaylistPlayer(IJSRuntime js) : IPlaylistPlayer
         StateChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    public async Task RemoveTrackAsync(int index, CancellationToken cancellationToken = default)
+    {
+        if (index < 0 || index >= tracks.Count)
+            return;
+
+        if (index == currentIndex)
+        {
+            if (index + 1 < tracks.Count)
+            {
+                await PlayAsync(index + 1, cancellationToken);
+            }
+            else
+            {
+                await js.InvokeVoidAsync("coverPlayer.pause", cancellationToken);
+                isPlaying = false;
+                isPaused = false;
+                position = 0;
+                duration = 0;
+                currentIndex = -1;
+            }
+        }
+
+        tracks.RemoveAt(index);
+        if (index < currentIndex)
+            currentIndex--;
+        IsPlaylistModified = true;
+        StateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     public async Task<string?> SavePlaylistAsync(CancellationToken cancellationToken = default)
     {
         const string name = "CoverPlayer.m3u";

@@ -185,19 +185,45 @@
         </section>
     }
 
-    @if (editorVisible)
+    @if (editorVisible && !libraryVisible)
     {
         <section class="library-dialog" style="--editor-cover-size: @(editorCoverSize)rem;" @onclick:stopPropagation="true">
             <div class="control-dialog-header">
                 <span>Playlist bearbeiten (@FilteredPlaylist.Count() von @Player.Tracks.Count)</span>
                 <button class="close-button" title="Schließen" @onclick="CloseEditor">×</button>
             </div>
-            <input class="editor-search" type="search" placeholder="Suchen …"
-                   @bind="editorSearch" @bind:event="oninput" />
+            <div class="editor-toolbar">
+                <input class="editor-search" type="search" placeholder="Suchen …"
+                       @bind="editorSearch" @bind:event="oninput" />
+                <button @onclick="RemoveSelectedTrackAsync" disabled="@(!CanRemoveSelected)"
+                        title="Lied entfernen" aria-label="Lied entfernen">
+                    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor"
+                         aria-hidden="true" focusable="false" style="vertical-align: -0.125em;">
+                        <path d="M9 3h6l1 2h4v2H4V5h4z" />
+                        <path d="M6 9h12l-1 11.2a1 1 0 0 1-1 .8H8a1 1 0 0 1-1-.8z" />
+                    </svg>
+                </button>
+                <button @onclick="OpenLibraryAsync" title="Lied hinzufügen" aria-label="Lied hinzufügen">+</button>
+                <button @onclick="ShowSelectedTrackInfo" disabled="@(SelectedTrack is null)"
+                        title="Details zum Lied" aria-label="Details zum Lied">i</button>
+            </div>
+            @if (selectionMode)
+            {
+                <div class="selection-toolbar">
+                    <span>@selectedIndices.Count ausgewählt</span>
+                    <button @onclick="SelectAllVisible" title="Alle auswählen" aria-label="Alle auswählen">Alle</button>
+                    <button @onclick="EndSelectionMode" title="Auswahl beenden" aria-label="Auswahl beenden">×</button>
+                </div>
+            }
             <div class="library-table-wrapper">
                 <table class="library-table editor-table">
                     <thead>
                         <tr>
+                            <th class="editor-grip-cell"></th>
+                            @if (selectionMode)
+                            {
+                                <th class="editor-check-cell"></th>
+                            }
                             <th class="sortable" @onclick="() => EditorSortBy(EditorSortColumn.Position)">Nr.@(EditorSortIndicator(EditorSortColumn.Position))</th>
                             <th class="sortable" @onclick="() => EditorSortBy(EditorSortColumn.Artist)">Interpret@(EditorSortIndicator(EditorSortColumn.Artist))</th>
                             <th class="sortable" @onclick="() => EditorSortBy(EditorSortColumn.Title)">Titel@(EditorSortIndicator(EditorSortColumn.Title))</th>
@@ -208,8 +234,32 @@
                         @foreach (var (track, index) in FilteredPlaylist)
                         {
                             var details = GetEditorDetails(track);
-                            <tr @key="track" class="@(index == Player.CurrentIndex ? "current-row" : null)">
-                                <td class="editor-position" @onclick="() => BeginEditPosition(index)">
+                            <tr @key="track" class="@EditorRowClass(index)" @onclick="e => SelectRow(index, e)"
+                                @onpointerdown="e => BeginLongPress(index, e)"
+                                @onpointermove="MoveLongPress"
+                                @onpointerup="CancelLongPress"
+                                @onpointercancel="CancelLongPress"
+                                @onpointerleave="CancelLongPress"
+                                @oncontextmenu:preventDefault="true"
+                                @ondragenter="() => dropIndex = index"
+                                @ondragover:preventDefault="true"
+                                @ondrop="() => DropTrack(index)">
+                                <td class="editor-grip-cell">
+                                    <span class="editor-grip" draggable="@(editingIndex is null ? "true" : "false")"
+                                          title="Verschieben" aria-label="Verschieben"
+                                          @onpointerdown:stopPropagation="true"
+                                          @onclick:stopPropagation="true"
+                                          @ondragstart="() => BeginDrag(index)"
+                                          @ondragend="EndDrag">≡</span>
+                                </td>
+                                @if (selectionMode)
+                                {
+                                    <td class="editor-check-cell">
+                                        <input type="checkbox" checked="@selectedIndices.Contains(index)" tabindex="-1"
+                                               aria-label="Auswählen" style="pointer-events: none;" />
+                                    </td>
+                                }
+                                <td class="editor-position" @onclick="() => { if (!selectionMode) BeginEditPosition(index); }">
                                     @if (editingIndex == index)
                                     {
                                         <input type="number" min="1" max="@Player.Tracks.Count"
@@ -222,8 +272,8 @@
                                         @(index + 1)
                                     }
                                 </td>
-                                <td class="editor-link" @onclick="() => ShowTrackInfo(track)">@track.Artist</td>
-                                <td class="editor-link" @onclick="() => ShowTrackInfo(track)">@track.Title</td>
+                                <td>@track.Artist</td>
+                                <td>@track.Title</td>
                                 <td class="editor-cover-cell">
                                     <button class="editor-cover" title="Abspielen" aria-label="Abspielen"
                                             @onclick="() => PlayFromEditorAsync(index)">
@@ -252,6 +302,16 @@
                 </table>
             </div>
         </section>
+    }
+
+    @if (removingTrack is not null)
+    {
+        <div class="insert-overlay busy-overlay" @onclick:stopPropagation="true">
+            <section class="insert-dialog" role="alertdialog" aria-live="assertive">
+                <span class="busy-spinner" aria-hidden="true"></span>
+                <span>@removingTrack entfernt …</span>
+            </section>
+        </div>
     }
 
     @if (pendingTrack is not null)
@@ -564,6 +624,14 @@
 
     private bool HandleBack()
     {
+        if (removingTrack is not null)
+            return true;
+        if (selectionMode && editorVisible && !libraryVisible && pendingTrack is null &&
+            trackInfo is null && rawTags is null && pictures is null)
+        {
+            _ = InvokeAsync(() => { EndSelectionMode(); StateHasChanged(); });
+            return true;
+        }
         if (animationChoices is not null)
         {
             _ = InvokeAsync(() => { animationChoices = null; StateHasChanged(); });
@@ -589,7 +657,7 @@
             _ = InvokeAsync(() => { trackInfo = null; StateHasChanged(); });
             return true;
         }
-        if (editorVisible)
+        if (editorVisible && !libraryVisible && pendingTrack is null)
         {
             _ = InvokeAsync(() => { CloseEditor(); StateHasChanged(); });
             return true;
@@ -629,7 +697,7 @@
 
         await LoadSettingsAsync();
 
-        keyboardReference
+        keyboardReference = DotNetObjectReference.Create(this);
         await Js.InvokeVoidAsync("coverPlayerKeyboard.register", keyboardReference);
     }
 
@@ -668,8 +736,9 @@
     }
 
     [JSInvokable]
-    public Task HandleKeyboardShortcut
+    public Task HandleKeyboardShortcut(string key) => key switch
     {
+        "delete" => RemoveSelectedTrackAsync(),
         "n" => NextAsync(),
         "p" => PreviousAsync(),
         "+" => ChangeVolumeAsync(.05),
@@ -759,16 +828,234 @@
     private readonly HashSet<string> editorDetailsLoading = new(StringComparer.Ordinal);
     private static readonly EditorDetails EmptyDetails = new(null, null);
 
+    private readonly SortedSet<int> selectedIndices = [];
+    private int? selectionAnchor;
+
+    private void ClearSelection()
+    {
+        selectedIndices.Clear();
+        selectionAnchor = null;
+        selectionMode = false;
+    }
+
+    private bool selectionMode;
+    private CancellationTokenSource? longPressCancellation;
+    private (double X, double Y)? longPressStart;
+    private bool suppressRowClick;
+
+    private void EndSelectionMode() => ClearSelection();
+
+    private void SelectAllVisible()
+    {
+        foreach (var (_, index) in FilteredPlaylist)
+            selectedIndices.Add(index);
+    }
+
+    private async Task BeginLongPress(int index, PointerEventArgs e)
+    {
+        CancelLongPress();
+        if (e.PointerType == "mouse" && e.Button != 0)
+            return;
+
+        var cancellation = new CancellationTokenSource();
+        longPressCancellation = cancellation;
+        longPressStart = (e.ClientX, e.ClientY);
+        try
+        {
+            await Task.Delay(500, cancellation.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        finally
+        {
+            if (ReferenceEquals(longPressCancellation, cancellation))
+            {
+                longPressCancellation = null;
+                longPressStart = null;
+            }
+            cancellation.Dispose();
+        }
+
+        editingIndex = null;
+        selectionMode = true;
+        selectedIndices.Add(index);
+        selectionAnchor = index;
+        suppressRowClick = true;
+    }
+
+    private void MoveLongPress(PointerEventArgs e)
+    {
+        if (longPressStart is { } start &&
+            Math.Abs(e.ClientX - start.X) + Math.Abs(e.ClientY - start.Y) > 10)
+            CancelLongPress();
+    }
+
+    private void CancelLongPress()
+    {
+        longPressCancellation?.Cancel();
+        longPressCancellation = null;
+        longPressStart = null;
+    }
+
     private void OpenEditor()
     {
         editorVisible = true;
         editingIndex = null;
+        ClearSelection();
     }
 
     private void CloseEditor()
     {
         editorVisible = false;
         editingIndex = null;
+        ClearSelection();
+    }
+
+    private void SelectRow(int index, MouseEventArgs e)
+    {
+        if (suppressRowClick)
+        {
+            suppressRowClick = false;
+            return;
+        }
+
+        if (selectionMode && !e.ShiftKey)
+        {
+            if (!selectedIndices.Remove(index))
+                selectedIndices.Add(index);
+            selectionAnchor = index;
+            return;
+        }
+
+        if (e.ShiftKey && selectionAnchor is { } anchor)
+        {
+            var visible = FilteredPlaylist.Select(x => x.Index).ToList();
+            var from = visible.IndexOf(anchor);
+            var to = visible.IndexOf(index);
+            if (from >= 0 && to >= 0)
+            {
+                if (!e.CtrlKey)
+                    selectedIndices.Clear();
+                foreach (var i in visible.GetRange(Math.Min(from, to), Math.Abs(to - from) + 1))
+                    selectedIndices.Add(i);
+                return;
+            }
+        }
+
+        if (e.CtrlKey || e.MetaKey)
+        {
+            if (!selectedIndices.Remove(index))
+                selectedIndices.Add(index);
+        }
+        else
+        {
+            selectedIndices.Clear();
+            selectedIndices.Add(index);
+        }
+        selectionAnchor = index;
+    }
+
+    private string? EditorRowClass(int index) =>
+        string.Join(' ', new[]
+        {
+            index == Player.CurrentIndex ? "current-row" : null,
+            selectedIndices.Contains(index) ? "selected-row" : null,
+            dragIndex is not null && index == dropIndex && !DraggedIndices.Contains(index) ? "drop-target" : null
+        }.Where(c => c is not null)) is { Length: > 0 } css ? css : null;
+
+    private int? dragIndex;
+    private int? dropIndex;
+
+    private IReadOnlyCollection<int> DraggedIndices =>
+        dragIndex is { } drag ? selectedIndices.Contains(drag) ? selectedIndices : [drag] : [];
+
+    private void BeginDrag(int index)
+    {
+        dragIndex = index;
+        if (!selectedIndices.Contains(index))
+        {
+            selectedIndices.Clear();
+            selectedIndices.Add(index);
+            selectionAnchor = index;
+        }
+    }
+
+    private void DropTrack(int target)
+    {
+        var moving = DraggedIndices.Where(i => i >= 0 && i < Player.Tracks.Count).OrderBy(i => i).ToList();
+        EndDrag();
+        if (moving.Count == 0 || moving.Contains(target))
+            return;
+
+        var targetInRest = target - moving.Count(i => i < target);
+        var insertAt = moving[0] < target ? targetInRest + 1 : targetInRest;
+
+        var count = Player.Tracks.Count;
+        for (var k = 0; k < moving.Count; k++)
+            Player.MoveTrack(moving[k] - k, count - 1);
+        for (var k = 0; k < moving.Count; k++)
+            Player.MoveTrack(count - moving.Count + k, insertAt + k);
+
+        selectedIndices.Clear();
+        for (var k = 0; k < moving.Count; k++)
+            selectedIndices.Add(insertAt + k);
+        selectionAnchor = insertAt;
+    }
+
+    private void EndDrag()
+    {
+        dragIndex = null;
+        dropIndex = null;
+    }
+
+    private IReadOnlyList<int> EffectiveIndices =>
+        selectedIndices.Where(i => i >= 0 && i < Player.Tracks.Count).ToList() is { Count: > 0 } selected ? selected
+        : Player.CurrentIndex >= 0 && Player.CurrentIndex < Player.Tracks.Count ? [Player.CurrentIndex]
+        : [];
+
+    private Track? SelectedTrack => EffectiveIndices is { Count: > 0 } indices ? Player.Tracks[indices[0]] : null;
+
+    private void ShowSelectedTrackInfo()
+    {
+        if (SelectedTrack is { } track)
+            ShowTrackInfo(track);
+    }
+
+    private bool CanRemoveSelected => EffectiveIndices.Count > 0 && removingTrack is null;
+
+    private string? removingTrack;
+
+    private async Task RemoveSelectedTrackAsync()
+    {
+        var indices = EffectiveIndices;
+        if (!editorVisible || libraryVisible || pendingTrack is not null || removingTrack is not null ||
+            indices.Count == 0)
+            return;
+
+        editingIndex = null;
+        if (indices.Count == 1)
+        {
+            var track = Player.Tracks[indices[0]];
+            removingTrack = "„" + (string.IsNullOrWhiteSpace(track.Title) ? Path.GetFileName(track.Source) : track.Title) + "“ wird";
+        }
+        else
+        {
+            removingTrack = $"{indices.Count} Lieder werden";
+        }
+        StateHasChanged();
+        try
+        {
+            foreach (var index in indices.OrderByDescending(i => i))
+                await Player.RemoveTrackAsync(index);
+        }
+        finally
+        {
+            removingTrack = null;
+            ClearSelection();
+        }
+        StateHasChanged();
     }
 
     private void EditorSortBy(EditorSortColumn column)

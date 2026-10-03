@@ -359,6 +359,49 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
         RaiseStateChanged();
     }
 
+    public async Task RemoveTrackAsync(int index, CancellationToken cancellationToken = default)
+    {
+        if (index < 0 || index >= tracks.Count)
+            return;
+
+        if (index == currentIndex)
+        {
+            if (index + 1 < tracks.Count)
+                await TransitionByAsync(0, cancellationToken, index + 1);
+            else
+                Stop();
+        }
+
+        if (index >= tracks.Count)
+            return;
+        tracks.RemoveAt(index);
+        if (index < currentIndex)
+            currentIndex--;
+        else if (index == currentIndex)
+            currentIndex = -1;
+        failedTransitionIndex = null;
+        IsPlaylistModified = true;
+        RaiseStateChanged();
+    }
+
+    private void Stop()
+    {
+        CancelTransitionRequest();
+        monitorCancellation?.Cancel();
+        try
+        {
+            audioPlayer?.Stop();
+            audioPlayer?.Dispose();
+        }
+        catch (Exception)
+        {
+        }
+        audioPlayer = null;
+        currentIndex = -1;
+        IsPlaying = false;
+        IsPaused = false;
+    }
+
     public async Task<string?> SavePlaylistAsync(CancellationToken cancellationToken = default)
     {
         try
