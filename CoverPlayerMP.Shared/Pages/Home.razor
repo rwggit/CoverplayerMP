@@ -187,7 +187,7 @@
 
     @if (editorVisible)
     {
-        <section class="library-dialog" @onclick:stopPropagation="true">
+        <section class="library-dialog" style="--editor-cover-size: @(editorCoverSize)rem;" @onclick:stopPropagation="true">
             <div class="control-dialog-header">
                 <span>Playlist bearbeiten (@FilteredPlaylist.Count() von @Player.Tracks.Count)</span>
                 <button class="close-button" title="Schließen" @onclick="CloseEditor">×</button>
@@ -366,10 +366,18 @@
                                @oninput="OnCrossfadeChanged" />
                         <span class="setting-value">@Player.CrossfadeSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) s</span>
                     </label>
+                    <label class="setting-row">
+                        <span>Cover-Größe</span>
+                        <input type="range" min="3" max="12" step="1"
+                               title="Größe der Cover in der Playlistbearbeitung: @editorCoverSize rem"
+                               value="@editorCoverSize"
+                               @oninput="OnEditorCoverSizeChanged" />
+                        <span class="setting-value">@editorCoverSize rem</span>
+                    </label>
                     <button @onclick="OpenAnimationsAsync">Animationen</button>
                     @if (Player.CanQuit)
                     {
-                        <button @onclick="RequestQuit">Beenden</button>
+                        <button @onclick="RequestQuit">CoverplayerMP beenden</button>
                     }
                     else if (Player.IsPlaylistModified)
                     {
@@ -426,6 +434,7 @@
 
 @code {
     private bool controlsVisible;
+    private int editorCoverSize = 5;
     private string? coverUri;
     private string? coverSource;
     private ElementReference coverCanvas;
@@ -618,12 +627,48 @@
         if (!firstRender)
             return;
 
-        keyboardReference = DotNetObjectReference.Create(this);
+        await LoadSettingsAsync();
+
+        keyboardReference
         await Js.InvokeVoidAsync("coverPlayerKeyboard.register", keyboardReference);
     }
 
+    private const string CrossfadeKey = "coverPlayer.crossfadeSeconds";
+    private const string EditorCoverSizeKey = "coverPlayer.editorCoverSize";
+
+    private async Task LoadSettingsAsync()
+    {
+        try
+        {
+            var crossfade = await Js.InvokeAsync<string?>("localStorage.getItem", CrossfadeKey);
+            if (double.TryParse(crossfade, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var seconds))
+                Player.CrossfadeSeconds = Math.Clamp(seconds, 0, 5);
+
+            var coverSize = await Js.InvokeAsync<string?>("localStorage.getItem", EditorCoverSizeKey);
+            if (int.TryParse(coverSize, out var size))
+                editorCoverSize = Math.Clamp(size, 3, 12);
+
+            StateHasChanged();
+        }
+        catch (JSException)
+        {
+        }
+    }
+
+    private async Task SaveSettingAsync(string key, string value)
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("localStorage.setItem", key, value);
+        }
+        catch (JSException)
+        {
+        }
+    }
+
     [JSInvokable]
-    public Task HandleKeyboardShortcut(string key) => key switch
+    public Task HandleKeyboardShortcut
     {
         "n" => NextAsync(),
         "p" => PreviousAsync(),
@@ -1017,13 +1062,26 @@
         displayPosition = Player.Position;
     }
 
-    private void OnCrossfadeChanged(ChangeEventArgs args)
+    private async Task OnCrossfadeChanged(ChangeEventArgs args)
     {
         if (double.TryParse(args.Value?.ToString(),
                 System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture,
                 out var value))
+        {
             Player.CrossfadeSeconds = Math.Clamp(value, 0, 5);
+            await SaveSettingAsync(CrossfadeKey,
+                Player.CrossfadeSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+    }
+
+    private async Task OnEditorCoverSizeChanged(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var value))
+        {
+            editorCoverSize = Math.Clamp(value, 3, 12);
+            await SaveSettingAsync(EditorCoverSizeKey, editorCoverSize.ToString());
+        }
     }
 
     private void OnVolumeChanged(ChangeEventArgs args)

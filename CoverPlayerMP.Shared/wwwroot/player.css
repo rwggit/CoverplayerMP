@@ -327,12 +327,12 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 }
 .editor-table td.editor-link { cursor: pointer; }
 .editor-table td.editor-link:hover { text-decoration: underline; }
-.editor-table td.editor-cover-cell, .editor-table th:last-child { width: 5.5rem; padding: .25rem; }
+{ width: calc(var(--editor-cover-size, 5rem) + .5rem); padding: .25rem; }
 .editor-cover {
     position: relative;
     display: block;
-    width: 5rem;
-    height: 5rem;
+    width: var(--editor-cover-size, 5rem);
+    height: var(--editor-cover-size, 5rem);
     padding: 0;
     overflow: hidden;
     border: 1px solid #373c50;
