@@ -1,11 +1,13 @@
-﻿using Plugin.Maui.Audio;
+﻿using System.Runtime.CompilerServices;
+using Plugin.Maui.Audio;
 using CoverPlayerMP.Shared.Player;
 using CoverPlayerMP.Shared.Localization;
 
 namespace CoverPlayerMP.Player;
 
-public sealed class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer
+public sealed class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, ICoverFileAccess
 {
+    private readonly ConditionalWeakTable<IAudioPlayer, Stream> playerStreams = new();
     private readonly IAudioManager audioManager = AudioManager.Current;
     private IAudioPlayer? audioPlayer;
     private CancellationTokenSource? monitorCancellation;
@@ -527,7 +529,10 @@ public sealed class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer
 #if ANDROID
             return (IAudioPlayer)new CoverPlayerMP.Platforms.Android.AndroidFilePlayer(source);
 #else
-            return audioManager.CreatePlayer(File.OpenRead(source));
+            var stream = File.OpenRead(source);
+            var player = audioManager.CreatePlayer(stream);
+            playerStreams.Add(player, stream);
+            return player;
 #endif
         }, cancellationToken);
 
@@ -777,6 +782,105 @@ public sealed class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer
         }
         monitorCancellation?.Dispose();
         return ValueTask.CompletedTask;
+    }
+
+    private void ReleasePlayer(IAudioPlayer player)
+    {
+        try
+        {
+            player.Stop();
+            player.Dispose();
+        }
+        catch (Exception)
+        {
+        }
+
+        if (playerStreams.TryGetValue(player, out var stream))
+        {
+            try
+            {
+                stream.Dispose();
+            }
+            catch (Exception)
+            {
+            }
+            playerStreams.Remove(player);
+        }
+    }
+
+    public async Task RunWithReleasedFileAsync(string source, Func<Task> action, CancellationToken cancellationToken = default)
+    {
+        bool IsCurrent() =>
+            audioPlayer is not null && currentIndex >= 0 && currentIndex < tracks.Count &&
+            string.Equals(tracks[currentIndex].Source, source, StringComparison.OrdinalIgnoreCase);
+
+        if (!IsCurrent())
+        {
+            await action();
+            return;
+        }
+
+        CancelTransitionRequest();
+        await transitionLock.WaitAsync(cancellationToken);
+        try
+        {
+            var player = audioPlayer;
+            if (player is null || !IsCurrent())
+            {
+                await action();
+                return;
+            }
+
+            var position = player.CurrentPosition;
+            var wasPlaying = IsPlaying;
+            var wasPaused = IsPaused;
+
+            // Ohne Ausblendung stoppen und Datei freigeben.
+            monitorCancellation?.Cancel();
+            monitorRunning = false;
+            audioPlayer = null;
+            IsPlaying = false;
+            ReleasePlayer(player);
+
+            try
+            {
+                await action();
+            }
+            finally
+            {
+                if (!isDisposed && File.Exists(source))
+                {
+                    var next = await CreatePlayerAsync(source, CancellationToken.None);
+                    next.Volume = wasPaused ? 0 : volume; // ohne Einblendung
+                    audioPlayer = next;
+                    try
+                    {
+                        if (position > 0 && position < next.Duration)
+                            next.Seek(position);
+                    }
+                    catch (Exception)
+                    {
+                    }
+
+                    if (wasPlaying)
+                    {
+                        next.Play();
+                        IsPlaying = true;
+                        IsPaused = false;
+                        StartMonitor();
+                    }
+                    else
+                    {
+                        IsPaused = wasPaused;
+                    }
+                    RaiseStateChanged();
+                }
+            }
+        }
+        finally
+        {
+            transitionLock.Release();
+        }
     }
 
     private void CancelTransitionRequest()

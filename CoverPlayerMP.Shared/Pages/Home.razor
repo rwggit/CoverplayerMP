@@ -1,8 +1,9 @@
-@page "/"
+﻿@page "/"
 @implements IAsyncDisposable
 @inject IPlaylistPlayer Player
 @inject IJSRuntime Js
 @inject AppText Text
+@inject CoverSearch CoverSearcher
 
 <PageTitle>CoverPlayerMP</PageTitle>
 
@@ -395,7 +396,25 @@
                     <span>@Text.CoverPictures</span>
                     <button class="close-button" title="@Text.Close" @onclick="ClosePictures">×</button>
                 </div>
+                <div class="animation-toolbar">
+                    <button @onclick="StartCoverSearchAsync">@ChangeLabel</button>
+                    @if (newCover is not null)
+                    {
+                        <button class="play-button" @onclick="ApplyCover">@Text.Apply</button>
+                    }
+                </div>
+                @if (coverSearching)
+                {
+                    <span>@CoverSearchWaitingLabel</span>
+                }
                 <div class="picture-list">
+                    @if (newCover is not null)
+                    {
+                        <figure>
+                            <img src="@newCover" alt="Cover.jpg" />
+                            <figcaption>Cover.jpg</figcaption>
+                        </figure>
+                    }
                     @if (pictures.Count == 0)
                     {
                         <span>@Text.NoCoverPictures</span>
@@ -547,7 +566,102 @@
 
     private void ShowPictures() => pictures = TrackMetadata.ReadPictures(infoSource);
 
-    private void ClosePictures() => pictures = null;
+    private void ClosePictures()
+    {
+        coverSearchCancellation?.Cancel();
+        coverSearching = false;
+        newCoverBytes = null;
+        newCover = null;
+        pictures = null;
+    }
+
+    private byte[]? newCoverBytes;
+    private string? newCover;
+    private bool coverSearching;
+    private CancellationTokenSource? coverSearchCancellation;
+
+    private string ChangeLabel => Text.Code switch
+    {
+        var c when c.StartsWith("de", StringComparison.OrdinalIgnoreCase) => "Anderes Cover suchen",
+        var c when c.StartsWith("fr", StringComparison.OrdinalIgnoreCase) => "Chercher une autre pochette",
+        _ => "Find another cover"
+    };
+
+    private string CoverSearchWaitingLabel => Text.Code switch
+    {
+        var c when c.StartsWith("de", StringComparison.OrdinalIgnoreCase) => "Warte auf Cover.jpg im Downloadordner …",
+        var c when c.StartsWith("fr", StringComparison.OrdinalIgnoreCase) => "En attente de Cover.jpg dans Téléchargements …",
+        _ => "Waiting for Cover.jpg in the downloads folder …"
+    };
+
+    private async Task StartCoverSearchAsync()
+    {
+        if (Player.CurrentTrack is not { } track || coverSearching)
+            return;
+
+        infoSource = track.Source;
+        pictures ??= [];
+        newCoverBytes = null;
+        newCover = null;
+        coverSearching = true;
+
+        coverSearchCancellation?.Cancel();
+        var cancellation = coverSearchCancellation = new CancellationTokenSource();
+        try
+        {
+            var url = CoverSearcher.Begin(track.Artist, track.Title);
+            await Js.InvokeVoidAsync("open", url, "_blank");
+            StateHasChanged();
+
+            newCoverBytes = await CoverSearcher.WaitForNewCoverAsync(TimeSpan.FromMinutes(5), cancellation.Token);
+            newCover = newCoverBytes is null
+                ? null
+                : $"data:image/jpeg;base64,{Convert.ToBase64String(newCoverBytes)}";
+        }
+        catch (Exception ex) when (disposed || ex is OperationCanceledException || IsShutdownException(ex))
+        {
+        }
+        finally
+        {
+            coverSearching = false;
+        }
+
+        if (!disposed)
+            StateHasChanged();
+    }
+
+    private async Task ApplyCover()
+    {
+        if (newCoverBytes is null || Player.CurrentTrack is not { } track)
+            return;
+
+        var bytes = newCoverBytes;
+        try
+        {
+            Task Write()
+            {
+                CoverSearch.Apply(track.Source, bytes);
+                return Task.CompletedTask;
+            }
+
+            // Läuft die Datei gerade, wird sie kurz freigegeben und danach nahtlos fortgesetzt.
+            if (Player is ICoverFileAccess access)
+                await access.RunWithReleasedFileAsync(track.Source, Write);
+            else
+                await Write();
+
+            coverUri = CoverImage.ToDataUri(track.CoverSource ?? track.Source);
+            coverChanged = true;
+            newCoverBytes = null;
+            newCover = null;
+            pictures = TrackMetadata.ReadPictures(infoSource);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or TagLib.CorruptFileException
+                                       or TagLib.UnsupportedFormatException)
+        {
+            newCover = null;
+        }
+    }
 
     private bool optionsVisible;
     private bool quitConfirmVisible;
@@ -794,12 +908,77 @@
         }
     }
 
+    private Task OpenEditorFromKeyAsync()
+    {
+        if (!IsMainDialogActive || Player.Tracks.Count == 0)
+            return Task.CompletedTask;
+
+        return InvokeAsync(OpenEditor);
+    }
+
+    private Task OpenLibraryFromKeyAsync()
+    {
+        if (!IsMainDialogActive)
+            return Task.CompletedTask;
+
+        return InvokeAsync(OpenLibraryAsync);
+    }
+
+    private Task OpenPlaylistFromKeyAsync()
+    {
+        if (!IsMainDialogActive)
+            return Task.CompletedTask;
+
+        return InvokeAsync(OpenPlaylistAsync);
+    }
+
+    private Task ShowTrackInfoFromKeyAsync()
+    {
+        if (!IsMainDialogActive || Player.CurrentTrack is null)
+            return Task.CompletedTask;
+
+        return InvokeAsync(() =>
+        {
+            ShowTrackInfo();
+            StateHasChanged();
+        });
+    }
+
+    private Task HandleEscapeAsync()
+    {
+        return InvokeAsync(() =>
+        {
+            if (!HandleBack() && controlsVisible)
+            {
+                HideControls();
+                StateHasChanged();
+            }
+        });
+    }
+
+    private Task StartCoverSearchFromKeyAsync()
+    {
+        if (!IsMainDialogActive)
+            return Task.CompletedTask;
+        return StartCoverSearchAsync();
+    }
+
+    private bool IsMainDialogActive =>
+        !editorVisible && !libraryVisible && !optionsVisible && trackInfo is null && rawTags is null &&
+        pictures is null && animationChoices is null && pendingTrack is null && removingTrack is null;
+
     [JSInvokable]
     public Task HandleKeyboardShortcut(string key) => key switch
     {
+        "c" => StartCoverSearchFromKeyAsync(),
+        "i" => ShowTrackInfoFromKeyAsync(),
+        "escape" => HandleEscapeAsync(),
         "delete" => RemoveSelectedTrackAsync(),
-        "n" => NextAsync(),
-        "p" => PreviousAsync(),
+        "p" or "arrowleft" => PreviousAsync(),
+        "n" or "arrowright" => NextAsync(),
+        "s" => OpenLibraryFromKeyAsync(),
+        "o" => OpenPlaylistFromKeyAsync(),
+        "l" => OpenEditorFromKeyAsync(),
         "+" => ChangeVolumeAsync(.05),
         "-" => ChangeVolumeAsync(-.05),
         " " => TogglePauseAsync(),
@@ -1458,6 +1637,7 @@
     public async ValueTask DisposeAsync()
     {
         disposed = true;
+        coverSearchCancellation?.Cancel();
         Player.StateChanged -= OnPlayerStateChanged;
         Text.LanguageChanged -= OnLanguageChangedEvent;
         BackNavigation.Handler = null;

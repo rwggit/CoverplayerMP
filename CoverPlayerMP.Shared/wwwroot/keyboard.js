@@ -1,21 +1,35 @@
 window.coverPlayerKeyboard = (() => {
     let callback;
 
+    const shortcuts = new Set(["n", "p", "c", "i", "s", "o", "l", "+", "-", "delete", "arrowleft", "arrowright"]);
+
+    function isTextInput(target) {
+        if (target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target?.isContentEditable) {
+            return true;
+        }
+        return target instanceof HTMLInputElement &&
+            !["range", "checkbox", "radio", "button"].includes(target.type);
+    }
+
     function onKeyDown(event) {
         if (event.repeat || event.ctrlKey || event.altKey || event.metaKey) {
             return;
         }
 
         const target = event.target;
-        if (target instanceof HTMLInputElement ||
-            target instanceof HTMLTextAreaElement ||
-            target instanceof HTMLSelectElement ||
-            target?.isContentEditable) {
+        if (event.key === "Escape") {
+            if (!isTextInput(target)) {
+                callback?.invokeMethodAsync("HandleKeyboardShortcut", "escape");
+            }
+            return;
+        }
+
+        if (isTextInput(target)) {
             return;
         }
 
         const key = event.key.toLowerCase();
-        if (key !== "n" && key !== "p" && key !== "+" && key !== "-" && key !== "delete" && event.key !== " ") {
+        if (!shortcuts.has(key) && event.key !== " ") {
             return;
         }
 
@@ -23,18 +37,25 @@ window.coverPlayerKeyboard = (() => {
         callback?.invokeMethodAsync("HandleKeyboardShortcut", event.key === " " ? " " : key);
     }
 
+    function onKeyUp(event) {
+        if (event.key === " " && !isTextInput(event.target)) {
+            event.preventDefault();
+        }
+    }
+
     return {
         register(dotNetCallback) {
             callback = dotNetCallback;
             document.addEventListener("keydown", onKeyDown);
+            document.addEventListener("keyup", onKeyUp);
         },
         unregister() {
             document.removeEventListener("keydown", onKeyDown);
+            document.removeEventListener("keyup", onKeyUp);
             callback = undefined;
         }
     };
 })();
-
 window.coverPlayerDragScroll = (() => {
     const edge = 60;
     const maxSpeed = 18;

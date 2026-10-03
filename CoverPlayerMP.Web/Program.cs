@@ -9,6 +9,7 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddScoped<CoverPlayerMP.Shared.Localization.AppText>();
 builder.Services.AddScoped<IPlaylistPlayer, WebPlaylistPlayer>();
+builder.Services.AddScoped<CoverPlayerMP.Shared.Player.CoverSearch>();
 
 var app = builder.Build();
 
