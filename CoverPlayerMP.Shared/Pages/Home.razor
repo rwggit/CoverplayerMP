@@ -690,28 +690,38 @@
         return true;
     }
 
+    private static bool IsShutdownException(Exception ex)
+    {
+        return ex is JSException
+            || ex is Microsoft.JSInterop.JSDisconnectedException
+            || ex is TaskCanceledException
+            || ex is ObjectDisposedException
+            || ex is InvalidOperationException
+            || ex is System.Runtime.InteropServices.COMException;
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (coverChanged && !disposed)
+        try
         {
-            coverChanged = false;
-            var duration = (int)Math.Round(Math.Max(0.6, Player.CrossfadeSeconds) * 1000);
-            try
+            if (coverChanged && !disposed)
             {
+                coverChanged = false;
+                var duration = (int)Math.Round(Math.Max(0.6, Player.CrossfadeSeconds) * 1000);
                 await Js.InvokeVoidAsync("coverTransition.show", coverCanvas, coverUri, duration);
             }
-            catch (JSException)
-            {
-            }
+
+            if (!firstRender || disposed)
+                return;
+
+            await LoadSettingsAsync();
+
+            keyboardReference = DotNetObjectReference.Create(this);
+            await Js.InvokeVoidAsync("coverPlayerKeyboard.register", keyboardReference);
         }
-
-        if (!firstRender)
-            return;
-
-        await LoadSettingsAsync();
-
-        keyboardReference = DotNetObjectReference.Create(this);
-        await Js.InvokeVoidAsync("coverPlayerKeyboard.register", keyboardReference);
+        catch (Exception ex) when (disposed || IsShutdownException(ex))
+        {
+        }
     }
 
     private const string CrossfadeKey = "coverPlayer.crossfadeSeconds";
@@ -737,12 +747,14 @@
         {
             try
             {
+                if (disposed)
+                    return;
                 await Js.InvokeVoidAsync("document.documentElement.setAttribute", "lang", Text.Code);
+                StateHasChanged();
             }
-            catch (JSException)
+            catch (Exception ex) when (disposed || IsShutdownException(ex))
             {
             }
-            StateHasChanged();
         });
     }
 
@@ -766,7 +778,7 @@
 
             StateHasChanged();
         }
-        catch (JSException)
+        catch (Exception ex) when (disposed || IsShutdownException(ex))
         {
         }
     }
@@ -777,7 +789,7 @@
         {
             await Js.InvokeVoidAsync("localStorage.setItem", key, value);
         }
-        catch (JSException)
+        catch (Exception ex) when (disposed || IsShutdownException(ex))
         {
         }
     }
@@ -811,7 +823,20 @@
             coverChanged = true;
         }
 
-        _ = InvokeAsync(StateHasChanged);
+        _ = RenderSafeAsync();
+    }
+
+    private async Task RenderSafeAsync()
+    {
+        try
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex) when (disposed ||
+            ex is ObjectDisposedException or Microsoft.JSInterop.JSDisconnectedException
+                or InvalidOperationException or System.Runtime.InteropServices.COMException)
+        {
+        }
     }
 
     private (double X, double Y, DateTime Time)? swipeStart;

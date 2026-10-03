@@ -488,7 +488,16 @@ public sealed class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer
     }
 #endif
 
-    public void Quit() => Application.Current?.Quit();
+    public void Quit()
+    {
+        // Zuerst Monitor, Transitions und Events stoppen, damit nach dem Schließen
+        // des WebViews keine Rendering-/JS-Aufrufe mehr ausgelöst werden.
+        _ = DisposeAsync();
+        // Dem Blazor-Renderer Zeit geben, Komponenten abzumelden, bevor das WebView zerstört wird.
+        _ = Task.Delay(200).ContinueWith(_ =>
+            MainThread.BeginInvokeOnMainThread(() => Application.Current?.Quit()),
+            TaskScheduler.Default);
+    }
 
     private async Task LoadTrackAsync(int index, CancellationToken cancellationToken)
     {
