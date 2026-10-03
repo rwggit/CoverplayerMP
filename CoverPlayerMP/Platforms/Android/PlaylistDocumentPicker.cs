@@ -37,6 +37,8 @@ public static class PlaylistDocumentPicker
         var activity = Platform.CurrentActivity
             ?? throw new InvalidOperationException("Keine aktive Android-Activity.");
 
+
+
         pending?.TrySetResult(null);
         pending = new TaskCompletionSource<AndroidUri?>();
 

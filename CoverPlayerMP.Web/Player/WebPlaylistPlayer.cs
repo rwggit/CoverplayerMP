@@ -132,6 +132,30 @@ public sealed class WebPlaylistPlayer(IJSRuntime js) : IPlaylistPlayer
             StateChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    public Task PlayWithCrossfadeAsync(int index, CancellationToken cancellationToken = default) =>
+        index < 0 || index >= tracks.Count ? Task.CompletedTask : PlayAsync(index, cancellationToken);
+
+    public void MoveTrack(int fromIndex, int toIndex)
+    {
+        if (fromIndex < 0 || fromIndex >= tracks.Count)
+            return;
+        toIndex = Math.Clamp(toIndex, 0, tracks.Count - 1);
+        if (fromIndex == toIndex)
+            return;
+
+        var track = tracks[fromIndex];
+        tracks.RemoveAt(fromIndex);
+        tracks.Insert(toIndex, track);
+        if (currentIndex == fromIndex)
+            currentIndex = toIndex;
+        else if (fromIndex < currentIndex && toIndex >= currentIndex)
+            currentIndex--;
+        else if (fromIndex > currentIndex && toIndex <= currentIndex)
+            currentIndex++;
+        IsPlaylistModified = true;
+        StateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     public async Task<string?> SavePlaylistAsync(CancellationToken cancellationToken = default)
     {
         const string name = "CoverPlayer.m3u";

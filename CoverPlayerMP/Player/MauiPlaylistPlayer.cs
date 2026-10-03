@@ -328,6 +328,37 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
         }
     }
 
+    public Task PlayWithCrossfadeAsync(int index, CancellationToken cancellationToken = default)
+    {
+        if (index < 0 || index >= tracks.Count)
+            return Task.CompletedTask;
+        if (index == currentIndex && audioPlayer is not null)
+            return IsPlaying ? RestartAsync(cancellationToken) : PlayAsync(index, cancellationToken);
+        return TransitionByAsync(0, cancellationToken, index);
+    }
+
+    public void MoveTrack(int fromIndex, int toIndex)
+    {
+        if (fromIndex < 0 || fromIndex >= tracks.Count)
+            return;
+        toIndex = Math.Clamp(toIndex, 0, tracks.Count - 1);
+        if (fromIndex == toIndex)
+            return;
+
+        var track = tracks[fromIndex];
+        tracks.RemoveAt(fromIndex);
+        tracks.Insert(toIndex, track);
+        if (currentIndex == fromIndex)
+            currentIndex = toIndex;
+        else if (fromIndex < currentIndex && toIndex >= currentIndex)
+            currentIndex--;
+        else if (fromIndex > currentIndex && toIndex <= currentIndex)
+            currentIndex++;
+        failedTransitionIndex = null;
+        IsPlaylistModified = true;
+        RaiseStateChanged();
+    }
+
     public async Task<string?> SavePlaylistAsync(CancellationToken cancellationToken = default)
     {
         try
@@ -447,7 +478,7 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
 #endif
         }, cancellationToken);
 
-    private async Task TransitionByAsync(int offset, CancellationToken cancellationToken)
+    private async Task TransitionByAsync(int offset, CancellationToken cancellationToken, int? targetIndex = null)
     {
         var transitionCancellation =
             CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -467,7 +498,9 @@ public sealed class MauiPlaylistPlayer : IPlaylistPlayer
             var baseIndex = failedTransitionIndex is { } failed && failedTransitionOffset == offset
                 ? failed
                 : currentIndex;
-            index = (baseIndex + offset + tracks.Count) % tracks.Count;
+            index = targetIndex is { } target && target >= 0 && target < tracks.Count
+                ? target
+                : (baseIndex + offset + tracks.Count) % tracks.Count;
 
             if (index == currentIndex && audioPlayer is not null)
             {

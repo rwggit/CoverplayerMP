@@ -60,6 +60,7 @@
             </div>
             <div class="control-toolbar">
                 <div class="control-buttons">
+                <div class="playlist-buttons">
                 <button @onclick="OpenPlaylistAsync"
                         title="Playlist öffnen" aria-label="Playlist öffnen">
                                             <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor"
@@ -68,6 +69,16 @@
                                                 <path d="M5.6 11a1 1 0 0 1 .9-.7h15.2a.8.8 0 0 1 .8 1l-2.1 7a1 1 0 0 1-1 .7H3.8a.8.8 0 0 1-.8-1z" />
                                             </svg>
                                         </button>
+                <button @onclick="OpenEditor" disabled="@(Player.Tracks.Count == 0)"
+                        title="Playlist bearbeiten" aria-label="Playlist bearbeiten">
+                    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor"
+                         aria-hidden="true" focusable="false" style="vertical-align: -0.125em;">
+                        <rect x="3" y="5" width="11" height="2" rx="1" />
+                        <rect x="3" y="10" width="11" height="2" rx="1" />
+                        <rect x="3" y="15" width="6" height="2" rx="1" />
+                        <path d="M18.6 9.2l2.2 2.2-7.3 7.3-2.9.7.7-2.9z" />
+                    </svg>
+                </button>
                 <button @onclick="OpenLibraryAsync"
                         title="Audiodateien suchen" aria-label="Audiodateien suchen">
                     <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor"
@@ -77,6 +88,7 @@
                         <path d="M15 15l6 6" />
                     </svg>
                 </button>
+                </div>
                 <button @onclick="PreviousAsync" disabled="@(Player.Tracks.Count == 0)"
                         title="Vorheriges" aria-label="Vorheriges">
                                             <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor"
@@ -170,6 +182,75 @@
                     </table>
                 </div>
             }
+        </section>
+    }
+
+    @if (editorVisible)
+    {
+        <section class="library-dialog" @onclick:stopPropagation="true">
+            <div class="control-dialog-header">
+                <span>Playlist bearbeiten (@FilteredPlaylist.Count() von @Player.Tracks.Count)</span>
+                <button class="close-button" title="Schließen" @onclick="CloseEditor">×</button>
+            </div>
+            <input class="editor-search" type="search" placeholder="Suchen …"
+                   @bind="editorSearch" @bind:event="oninput" />
+            <div class="library-table-wrapper">
+                <table class="library-table editor-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable" @onclick="() => EditorSortBy(EditorSortColumn.Position)">Nr.@(EditorSortIndicator(EditorSortColumn.Position))</th>
+                            <th class="sortable" @onclick="() => EditorSortBy(EditorSortColumn.Artist)">Interpret@(EditorSortIndicator(EditorSortColumn.Artist))</th>
+                            <th class="sortable" @onclick="() => EditorSortBy(EditorSortColumn.Title)">Titel@(EditorSortIndicator(EditorSortColumn.Title))</th>
+                            <th>Cover</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var (track, index) in FilteredPlaylist)
+                        {
+                            var details = GetEditorDetails(track);
+                            <tr @key="track" class="@(index == Player.CurrentIndex ? "current-row" : null)">
+                                <td class="editor-position" @onclick="() => BeginEditPosition(index)">
+                                    @if (editingIndex == index)
+                                    {
+                                        <input type="number" min="1" max="@Player.Tracks.Count"
+                                               @bind="editingValue" @bind:event="oninput"
+                                               @onkeydown="OnPositionKeyDown" @onblur="CommitPosition"
+                                               @onclick:stopPropagation="true" autofocus />
+                                    }
+                                    else
+                                    {
+                                        @(index + 1)
+                                    }
+                                </td>
+                                <td class="editor-link" @onclick="() => ShowTrackInfo(track)">@track.Artist</td>
+                                <td class="editor-link" @onclick="() => ShowTrackInfo(track)">@track.Title</td>
+                                <td class="editor-cover-cell">
+                                    <button class="editor-cover" title="Abspielen" aria-label="Abspielen"
+                                            @onclick="() => PlayFromEditorAsync(index)">
+                                        @if (details.Cover is not null)
+                                        {
+                                            <img src="@details.Cover" alt="" />
+                                        }
+                                        else
+                                        {
+                                            <span class="editor-cover-placeholder">♪</span>
+                                        }
+                                        <span class="editor-cover-play">
+                                            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+                                                <path d="M6 4.5v15a.8.8 0 0 0 1.2.7l12-7.5a.8.8 0 0 0 0-1.4l-12-7.5A.8.8 0 0 0 6 4.5z" />
+                                            </svg>
+                                        </span>
+                                        @if (details.Duration is { } duration)
+                                        {
+                                            <span class="editor-cover-duration">@FormatTime(duration.TotalSeconds)</span>
+                                        }
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         </section>
     }
 
@@ -362,20 +443,27 @@
     }
 
     private IReadOnlyList<KeyValuePair<string, string>>? trackInfo;
+    private string? infoSource;
 
-    private void ShowTrackInfo() => trackInfo = TrackMetadata.Read(Player.CurrentTrack?.Source);
+    private void ShowTrackInfo() => ShowTrackInfo(Player.CurrentTrack);
+
+    private void ShowTrackInfo(Track? track)
+    {
+        infoSource = track?.Source;
+        trackInfo = TrackMetadata.Read(infoSource);
+    }
 
     private void CloseTrackInfo() => trackInfo = null;
 
     private IReadOnlyList<KeyValuePair<string, string>>? rawTags;
 
-    private void ShowRawTags() => rawTags = TrackMetadata.ReadRawTags(Player.CurrentTrack?.Source);
+    private void ShowRawTags() => rawTags = TrackMetadata.ReadRawTags(infoSource);
 
     private void CloseRawTags() => rawTags = null;
 
     private IReadOnlyList<KeyValuePair<string, string>>? pictures;
 
-    private void ShowPictures() => pictures = TrackMetadata.ReadPictures(Player.CurrentTrack?.Source);
+    private void ShowPictures() => pictures = TrackMetadata.ReadPictures(infoSource);
 
     private void ClosePictures() => pictures = null;
 
@@ -492,6 +580,11 @@
             _ = InvokeAsync(() => { trackInfo = null; StateHasChanged(); });
             return true;
         }
+        if (editorVisible)
+        {
+            _ = InvokeAsync(() => { CloseEditor(); StateHasChanged(); });
+            return true;
+        }
 
         if (pendingTrack is null && !libraryVisible)
             return false;
@@ -606,6 +699,151 @@
     }
 
     private Task OpenPlaylistAsync() => Player.OpenPlaylistAsync();
+
+    private sealed record EditorDetails(string? Cover, TimeSpan? Duration);
+
+    private enum EditorSortColumn { Position, Artist, Title }
+
+    private bool editorVisible;
+    private string editorSearch = string.Empty;
+    private EditorSortColumn editorSortColumn = EditorSortColumn.Position;
+    private bool editorSortDescending;
+    private int? editingIndex;
+    private string editingValue = string.Empty;
+    private readonly Dictionary<string, EditorDetails> editorDetails = new(StringComparer.Ordinal);
+    private readonly HashSet<string> editorDetailsLoading = new(StringComparer.Ordinal);
+    private static readonly EditorDetails EmptyDetails = new(null, null);
+
+    private void OpenEditor()
+    {
+        editorVisible = true;
+        editingIndex = null;
+    }
+
+    private void CloseEditor()
+    {
+        editorVisible = false;
+        editingIndex = null;
+    }
+
+    private void EditorSortBy(EditorSortColumn column)
+    {
+        if (editorSortColumn == column)
+        {
+            editorSortDescending = !editorSortDescending;
+        }
+        else
+        {
+            editorSortColumn = column;
+            editorSortDescending = false;
+        }
+    }
+
+    private string EditorSortIndicator(EditorSortColumn column) =>
+        editorSortColumn != column ? string.Empty : editorSortDescending ? " ▼" : " ▲";
+
+    private IEnumerable<(Track Track, int Index)> FilteredPlaylist
+    {
+        get
+        {
+            var search = editorSearch.Trim();
+            var items = Player.Tracks.Select((t, i) => (Track: t, Index: i))
+                .Where(x => search.Length == 0 ||
+                            x.Track.Artist.Contains(search, StringComparison.CurrentCultureIgnoreCase) ||
+                            x.Track.Title.Contains(search, StringComparison.CurrentCultureIgnoreCase) ||
+                            (x.Index + 1).ToString() == search);
+            var comparer = StringComparer.CurrentCultureIgnoreCase;
+            return editorSortColumn switch
+            {
+                EditorSortColumn.Artist => editorSortDescending
+                    ? items.OrderByDescending(x => x.Track.Artist, comparer).ThenBy(x => x.Track.Title, comparer)
+                    : items.OrderBy(x => x.Track.Artist, comparer).ThenBy(x => x.Track.Title, comparer),
+                EditorSortColumn.Title => editorSortDescending
+                    ? items.OrderByDescending(x => x.Track.Title, comparer).ThenBy(x => x.Track.Artist, comparer)
+                    : items.OrderBy(x => x.Track.Title, comparer).ThenBy(x => x.Track.Artist, comparer),
+                _ => editorSortDescending ? items.OrderByDescending(x => x.Index) : items
+            };
+        }
+    }
+
+    private EditorDetails GetEditorDetails(Track track)
+    {
+        if (editorDetails.TryGetValue(track.Source, out var details))
+            return details;
+
+        if (editorDetailsLoading.Add(track.Source))
+            _ = LoadEditorDetailsAsync(track);
+        return EmptyDetails;
+    }
+
+    private async Task LoadEditorDetailsAsync(Track track)
+    {
+        var details = await Task.Run(() =>
+        {
+            string? cover = null;
+            TimeSpan? duration = null;
+            try
+            {
+                cover = CoverImage.ToDataUri(track.CoverSource ?? track.Source, 160);
+            }
+            catch (Exception)
+            {
+            }
+            try
+            {
+                if (File.Exists(track.Source))
+                {
+                    using var file = TagLib.File.Create(track.Source);
+                    if (file.Properties is { } props && props.Duration > TimeSpan.Zero)
+                        duration = props.Duration;
+                }
+            }
+            catch (Exception)
+            {
+            }
+            return new EditorDetails(cover, duration);
+        });
+
+        if (disposed)
+            return;
+        await InvokeAsync(() =>
+        {
+            editorDetails[track.Source] = details;
+            editorDetailsLoading.Remove(track.Source);
+            StateHasChanged();
+        });
+    }
+
+    private async Task PlayFromEditorAsync(int index)
+    {
+        editingIndex = null;
+        await Player.PlayWithCrossfadeAsync(index);
+    }
+
+    private void BeginEditPosition(int index)
+    {
+        if (editingIndex == index)
+            return;
+        editingIndex = index;
+        editingValue = (index + 1).ToString();
+    }
+
+    private void OnPositionKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            CommitPosition();
+        else if (e.Key == "Escape")
+            editingIndex = null;
+    }
+
+    private void CommitPosition()
+    {
+        if (editingIndex is not { } from)
+            return;
+        editingIndex = null;
+        if (int.TryParse(editingValue.Trim(), out var position))
+            Player.MoveTrack(from, Math.Clamp(position, 1, Player.Tracks.Count) - 1);
+    }
 
     private bool libraryVisible;
     private bool libraryLoading;

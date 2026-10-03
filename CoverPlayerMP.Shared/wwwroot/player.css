@@ -304,6 +304,66 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .library-table th.sortable:hover { color: #fff; background: #30364a; }
 .library-table tbody tr:hover { background: #30364a; }
 
+.playlist-buttons { display: flex; gap: .5rem; margin-right: 1.5rem; }
+.editor-search {
+    margin-bottom: .5rem;
+    padding: .45rem .6rem;
+    border: 1px solid #5c637b;
+    border-radius: .4rem;
+    background: #10131b;
+    color: #fff;
+}
+.editor-table thead tr:first-child th { top: 0; }
+.editor-table tbody tr { cursor: default; }
+.editor-table tbody tr.current-row { background: #2a2650; }
+.editor-table td.editor-position { width: 4rem; cursor: pointer; font-variant-numeric: tabular-nums; }
+.editor-table td.editor-position input {
+    width: 3.5rem;
+    padding: .2rem .3rem;
+    border: 1px solid #5c637b;
+    border-radius: .3rem;
+    background: #10131b;
+    color: #fff;
+}
+.editor-table td.editor-link { cursor: pointer; }
+.editor-table td.editor-link:hover { text-decoration: underline; }
+.editor-table td.editor-cover-cell, .editor-table th:last-child { width: 5.5rem; padding: .25rem; }
+.editor-cover {
+    position: relative;
+    display: block;
+    width: 5rem;
+    height: 5rem;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid #373c50;
+    border-radius: .4rem;
+    background: #10131b;
+}
+.editor-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.editor-cover-placeholder { display: grid; place-items: center; height: 100%; font-size: 2rem; color: #6b7290; }
+.editor-cover-play {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: rgb(255 255 255 / 75%);
+    background: rgb(0 0 0 / 15%);
+    transition: background .15s, color .15s;
+}
+.editor-cover-play svg { width: 2rem; height: 2rem; filter: drop-shadow(0 0 3px rgb(0 0 0 / 80%)); }
+.editor-cover:hover .editor-cover-play { color: #fff; background: rgb(0 0 0 / 35%); }
+.editor-cover-duration {
+    position: absolute;
+    right: .2rem;
+    bottom: .2rem;
+    padding: 0 .25rem;
+    border-radius: .25rem;
+    background: rgb(0 0 0 / 70%);
+    color: #fff;
+    font-size: .7rem;
+    font-variant-numeric: tabular-nums;
+}
+
 .insert-overlay {
     position: absolute;
     inset: 0;
