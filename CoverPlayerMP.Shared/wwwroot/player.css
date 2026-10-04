@@ -1,4 +1,4 @@
-.player-shell {
+﻿.player-shell {
     position: relative;
     width: 100%;
     height: 100%;
@@ -209,7 +209,7 @@
     align-items: center;
     justify-content: center;
 }
-.control-buttons { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; }
+.control-buttons { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; justify-content: center; }
 .setting-inline {
     flex: 0 1 10rem;
     min-width: 8rem;
@@ -228,10 +228,10 @@
     width: 5rem;
     min-width: 4rem;
 }
-.setting-inline:has(input[title^="Lautstärke"]) {
+.setting-inline:has(input[title^="LautstÃ¤rke"]) {
     flex-basis: 14rem;
 }
-.setting-inline input[title^="Lautstärke"] {
+.setting-inline input[title^="LautstÃ¤rke"] {
     flex: 1 1 10rem;
     width: 10rem;
     min-width: 0;
@@ -307,7 +307,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .library-table th.sortable:hover { color: #fff; background: #30364a; }
 .library-table tbody tr:hover { background: #30364a; }
 
-.playlist-buttons { display: flex; gap: .5rem; margin-right: 1.5rem; }
+.playlist-buttons { display: flex; gap: .5rem; justify-content: center; }
 .player-buttons { display: flex; gap: .5rem; }
 .editor-search {
     margin-bottom: .5rem;
