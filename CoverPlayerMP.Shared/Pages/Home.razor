@@ -466,6 +466,10 @@
                         </select>
                     </label>
                     <button @onclick="OpenAnimationsAsync">@Text.Animations</button>
+                    @if (Player.SupportsRemotePlayback)
+                    {
+                        <button @onclick="OpenRemoteDevicesAsync">@Text.RemotePlayback</button>
+                    }
                     @if (Player.CanQuit)
                     {
                         <button @onclick="RequestQuit">@Text.QuitApp</button>
@@ -517,6 +521,43 @@
                 <div class="animation-toolbar">
                     <button class="play-button" @onclick="SaveAnimationsAsync">@Text.Apply</button>
                     <button @onclick="CloseAnimations">@Text.Cancel</button>
+                </div>
+            </section>
+        </div>
+    }
+    @if (remoteDialogVisible)
+    {
+        <div class="insert-overlay" @onclick="CloseRemoteDialog" @onclick:stopPropagation="true">
+            <section class="info-dialog" @onclick:stopPropagation="true">
+                <div class="control-dialog-header">
+                    <span>@Text.RemotePlayback</span>
+                    <button class="close-button" title="@Text.Close" @onclick="CloseRemoteDialog">×</button>
+                </div>
+                <div class="remote-list">
+                    <button class="remote-device @(Player.ActiveDevice is null ? "active" : null)" @onclick="() => SelectRemoteDeviceAsync(null)">
+                        <span>@Text.RemoteThisDevice</span>
+                    </button>
+                    @if (remoteDevices is not null)
+                    {
+                        @foreach (var device in remoteDevices)
+                        {
+                            <button class="remote-device @(Player.ActiveDevice?.Id == device.Id ? "active" : null)" @onclick="() => SelectRemoteDeviceAsync(device)">
+                                <span>@device.Name</span>
+                                <span class="remote-connection">@device.Connection</span>
+                            </button>
+                        }
+                        @if (remoteDevices.Count == 0)
+                        {
+                            <span>@Text.RemoteNoDevices</span>
+                        }
+                    }
+                    else if (remoteSearching)
+                    {
+                        <span>@Text.RemoteSearching</span>
+                    }
+                </div>
+                <div class="animation-toolbar">
+                    <button @onclick="CloseRemoteDialog">@Text.Close</button>
                 </div>
             </section>
         </div>
@@ -713,6 +754,35 @@
 
     private List<AnimationChoice>? animationChoices;
 
+    private IReadOnlyList<RemoteDevice>? remoteDevices;
+    private bool remoteSearching;
+    private bool remoteDialogVisible;
+
+    private void CloseRemoteDialog() => remoteDialogVisible = false;
+
+    private async Task OpenRemoteDevicesAsync()
+    {
+        remoteDialogVisible = true;
+        remoteSearching = true;
+        remoteDevices = null;
+        StateHasChanged();
+        try
+        {
+            remoteDevices = await Player.GetRemoteDevicesAsync();
+        }
+        finally
+        {
+            remoteSearching = false;
+        }
+    }
+
+    private async Task SelectRemoteDeviceAsync(RemoteDevice? device)
+    {
+        remoteDialogVisible = false;
+        await Player.SelectRemoteDeviceAsync(device);
+        CloseOptions();
+    }
+
     private async Task OpenAnimationsAsync()
     {
         try
@@ -757,6 +827,11 @@
             trackInfo is null && rawTags is null && pictures is null)
         {
             _ = InvokeAsync(() => { EndSelectionMode(); StateHasChanged(); });
+            return true;
+        }
+        if (remoteDialogVisible)
+        {
+            _ = InvokeAsync(() => { remoteDialogVisible = false; StateHasChanged(); });
             return true;
         }
         if (animationChoices is not null)
@@ -965,7 +1040,7 @@
 
     private bool IsMainDialogActive =>
         !editorVisible && !libraryVisible && !optionsVisible && trackInfo is null && rawTags is null &&
-        pictures is null && animationChoices is null && pendingTrack is null && removingTrack is null;
+        pictures is null && animationChoices is null && !remoteDialogVisible && pendingTrack is null && removingTrack is null;
 
     [JSInvokable]
     public Task HandleKeyboardShortcut(string key) => key switch

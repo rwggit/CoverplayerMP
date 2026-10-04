@@ -5,7 +5,7 @@ using CoverPlayerMP.Shared.Localization;
 
 namespace CoverPlayerMP.Player;
 
-public sealed class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, ICoverFileAccess
+public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, ICoverFileAccess
 {
     private readonly ConditionalWeakTable<IAudioPlayer, Stream> playerStreams = new();
     private readonly IAudioManager audioManager = AudioManager.Current;
@@ -57,6 +57,7 @@ public sealed class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, ICoverFi
     public bool IsPlaying { get; private set; }
     public bool IsPaused { get; private set; }
     public string? ErrorMessage { get; private set; }
+
 
     public async Task OpenPlaylistAsync(CancellationToken cancellationToken = default)
     {
@@ -526,8 +527,17 @@ public sealed class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, ICoverFi
     private Task<IAudioPlayer> CreatePlayerAsync(string source, CancellationToken cancellationToken) =>
         Task.Run(() =>
         {
+            if (renderer is not null)
+            {
+                var index = tracks.FindIndex(x => string.Equals(x.Source, source, StringComparison.OrdinalIgnoreCase));
+                var track = index >= 0 ? tracks[index] : new Track(source, Path.GetFileNameWithoutExtension(source), string.Empty);
+                return (IAudioPlayer)new CoverPlayerMP.Player.Remote.RemoteAudioPlayer(renderer, fileServer, track, volume);
+            }
+
 #if ANDROID
-            return (IAudioPlayer)new CoverPlayerMP.Platforms.Android.AndroidFilePlayer(source);
+            var androidPlayer = new CoverPlayerMP.Platforms.Android.AndroidFilePlayer(source);
+            androidPlayer.SetPreferredDevice(preferredDevice);
+            return (IAudioPlayer)androidPlayer;
 #else
             var stream = File.OpenRead(source);
             var player = audioManager.CreatePlayer(stream);
@@ -781,6 +791,7 @@ public sealed class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, ICoverFi
         {
         }
         monitorCancellation?.Dispose();
+        DisposeRemote();
         return ValueTask.CompletedTask;
     }
 

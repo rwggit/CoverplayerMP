@@ -104,6 +104,12 @@ public sealed class AndroidFilePlayer : IAudioPlayer
         player.SeekTo(0);
     }
 
+    public void SetPreferredDevice(AudioDeviceInfo? device)
+    {
+        if (!disposed)
+            player.SetPreferredDevice(device);
+    }
+
     public void Seek(double position)
     {
         if (!disposed)

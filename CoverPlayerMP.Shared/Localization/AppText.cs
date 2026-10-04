@@ -122,6 +122,12 @@ public sealed class AppText
     public string LanguageLabel => T("Sprache", "Language", "Langue");
     public string LanguageAuto => T("Automatisch", "Automatic", "Automatique");
     public string Animations => T("Animationen", "Animations", "Animations");
+    public string RemotePlayback => T("Wiedergabe auf anderen Geräten", "Playback on other devices", "Lecture sur d'autres appareils");
+    public string RemoteSearching => T("Suche Geräte …", "Searching for devices …", "Recherche d'appareils …");
+    public string RemoteNoDevices => T("Keine Geräte gefunden.", "No devices found.", "Aucun appareil trouvé.");
+    public string ErrorRemote(string message) => T($"Wiedergabe auf dem Gerät fehlgeschlagen: {message}", $"Playback on the device failed: {message}", $"Échec de la lecture sur l'appareil : {message}");
+    public string RemoteThisDevice => T("Dieses Gerät", "This device", "Cet appareil");
+    public string RemoteScreen => T("Bildschirm übertragen …", "Cast screen …", "Caster l'écran …");
     public string QuitApp => T("CoverplayerMP beenden", "Quit CoverPlayerMP", "Quitter CoverPlayerMP");
     public string SavePlaylist => T("Playlist speichern", "Save playlist", "Enregistrer la playlist");
     public string SaveBeforeQuit => T("Die Playlist wurde verändert. Soll sie vor dem Beenden gespeichert werden?",

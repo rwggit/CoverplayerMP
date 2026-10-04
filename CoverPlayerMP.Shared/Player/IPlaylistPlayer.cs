@@ -14,6 +14,11 @@ public interface IPlaylistPlayer : IAsyncDisposable
     bool IsPlaying { get; }
     bool IsPaused { get; }
     string? ErrorMessage { get; }
+    bool SupportsRemotePlayback => false;
+    RemoteDevice? ActiveDevice => null;
+    Task<IReadOnlyList<RemoteDevice>> GetRemoteDevicesAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<RemoteDevice>>([]);
+    Task SelectRemoteDeviceAsync(RemoteDevice? device, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     Task OpenPlaylistAsync(CancellationToken cancellationToken = default);
     Task LoadPlaylistAsync(string pathOrContent, bool isContent = false, CancellationToken cancellationToken = default);

@@ -210,6 +210,10 @@
     justify-content: center;
 }
 .control-buttons { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; justify-content: center; }
+.remote-list { display: flex; flex-direction: column; gap: .5rem; max-height: 60vh; overflow-y: auto; }
+.remote-device { display: flex; justify-content: space-between; align-items: center; gap: 1rem; text-align: left; }
+.remote-device.active { outline: 2px solid currentColor; }
+.remote-connection { opacity: .7; white-space: nowrap; }
 .setting-inline {
     flex: 0 1 10rem;
     min-width: 8rem;
