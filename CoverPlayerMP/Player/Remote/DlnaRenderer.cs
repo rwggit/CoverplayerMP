@@ -76,8 +76,17 @@ internal sealed class DlnaRenderer(Uri descriptionLocation) : RemoteRenderer
             ? Task.CompletedTask
             : SendAsync(avTransportUrl, AvTransport, "Stop", ("InstanceID", "0"));
 
-    public override Task SeekAsync(double seconds) =>
-        SendAsync(avTransportUrl!, AvTransport, "Seek", ("InstanceID", "0"), ("Unit", "REL_TIME"), ("Target", FormatTime(seconds)));
+    public override async Task SeekAsync(double seconds)
+    {
+        try
+        {
+            await SendAsync(avTransportUrl!, AvTransport, "Seek", ("InstanceID", "0"), ("Unit", "REL_TIME"), ("Target", FormatTime(seconds)));
+        }
+        catch (InvalidOperationException)
+        {
+            await SendAsync(avTransportUrl!, AvTransport, "Seek", ("InstanceID", "0"), ("Unit", "ABS_TIME"), ("Target", FormatTime(seconds)));
+        }
+    }
 
     public override Task SetVolumeAsync(double volume) =>
         renderingControlUrl is null

@@ -12,6 +12,8 @@ public sealed partial class MauiPlaylistPlayer
     private Android.Media.AudioDeviceInfo? preferredDevice;
 #endif
 
+    private const double MaxRemoteVolume = 0.15;
+
     public bool SupportsRemotePlayback => true;
     public RemoteDevice? ActiveDevice { get; private set; }
 
@@ -19,6 +21,9 @@ public sealed partial class MauiPlaylistPlayer
     {
         var result = new List<RemoteDevice>();
 #if ANDROID
+        if (global::Android.OS.Build.VERSION.SdkInt >= (global::Android.OS.BuildVersionCodes)36)
+            await Permissions.RequestAsync<CoverPlayerMP.Platforms.Android.LocalNetworkPermission>();
+
         foreach (var device in GetOutputDevices())
             result.Add(new RemoteDevice(device.Id.ToString(), device.ProductName?.ToString() ?? device.Type.ToString(), RemoteDeviceKind.Audio, GetConnectionName(device.Type)));
 #endif
@@ -36,6 +41,8 @@ public sealed partial class MauiPlaylistPlayer
         }
 
         RemoteRenderer? newRenderer = null;
+        if (device is not null && Volume > MaxRemoteVolume)
+            Volume = MaxRemoteVolume;
 #if ANDROID
         Android.Media.AudioDeviceInfo? newPreferred = null;
 #endif

@@ -19,7 +19,11 @@ internal sealed class RemoteAudioPlayer : IAudioPlayer
     private DateTime stamp = DateTime.UtcNow;
     private double startOffset;
     private DateTime startTime = DateTime.UtcNow;
+    private DateTime ignoreStatusUntil = DateTime.MinValue;
+    private DateTime lastResume = DateTime.MinValue;
     private double volume = 1;
+    private double pendingSeek = -1;
+    private int seekQueued;
     private bool loaded;
     private bool playing;
     private bool disposed;
@@ -53,13 +57,16 @@ internal sealed class RemoteAudioPlayer : IAudioPlayer
         get
         {
             lock (sync)
-            {
-                if (!playing)
-                    return position;
-                var value = position + (DateTime.UtcNow - stamp).TotalSeconds;
-                return duration > 0 ? Math.Min(value, duration) : value;
-            }
+                return EstimatePosition();
         }
+    }
+
+    private double EstimatePosition()
+    {
+        if (!playing)
+            return position;
+        var value = position + (DateTime.UtcNow - stamp).TotalSeconds;
+        return duration > 0 ? Math.Min(value, duration) : value;
     }
 
     public double Volume
@@ -90,37 +97,54 @@ internal sealed class RemoteAudioPlayer : IAudioPlayer
 
     public void ApplyStatus(RemoteStatus status)
     {
+        var ended = false;
+        var resume = false;
         lock (sync)
         {
-            if (disposed || !IsReady)
+            if (disposed || !IsReady || DateTime.UtcNow < ignoreStatusUntil)
+                return;
+
+            if (status.State is RemoteState.Transitioning or RemoteState.Unknown)
                 return;
 
             var elapsed = (DateTime.UtcNow - startTime).TotalSeconds;
-            if (status.State == RemoteState.Transitioning || status.State == RemoteState.Unknown)
-                return;
-
             if (status.State == RemoteState.Stopped)
             {
-                if (playing && !stoppedByUs && duration > 0 && elapsed > 3)
+                if (!playing || stoppedByUs)
+                    return;
+
+                if (duration > 0 && EstimatePosition() >= duration - 3)
                 {
                     position = duration;
                     stamp = DateTime.UtcNow;
                     playing = false;
-                    PlaybackEnded?.Invoke(this, EventArgs.Empty);
+                    ended = true;
                 }
-                return;
+                else if (elapsed > 1 && (DateTime.UtcNow - lastResume).TotalSeconds > 5)
+                {
+                    // Das Gerät hat (z. B. nach einem Seek) mitten im Titel gestoppt: Wiedergabe fortsetzen.
+                    lastResume = DateTime.UtcNow;
+                    resume = true;
+                }
             }
+            else
+            {
+                // Verzögerte Werte des vorherigen Titels verwerfen.
+                if (status.Position > startOffset + elapsed + 5)
+                    return;
 
-            // Verzögerte Werte des vorherigen Titels verwerfen.
-            if (status.Position > startOffset + elapsed + 5)
-                return;
-
-            position = status.Position;
-            stamp = DateTime.UtcNow;
-            if (status.Duration > 0)
-                duration = status.Duration;
-            playing = status.State == RemoteState.Playing && !stoppedByUs;
+                position = status.Position;
+                stamp = DateTime.UtcNow;
+                if (status.Duration > 0)
+                    duration = status.Duration;
+                playing = status.State == RemoteState.Playing && !stoppedByUs;
+            }
         }
+
+        if (resume)
+            renderer.Enqueue(renderer.ResumeAsync);
+        if (ended)
+            PlaybackEnded?.Invoke(this, EventArgs.Empty);
     }
 
     public void Play()
@@ -172,13 +196,31 @@ internal sealed class RemoteAudioPlayer : IAudioPlayer
             await Task.Delay(500);
         }
 
-        await renderer.SeekAsync(seconds);
+        await SeekNowAsync(seconds);
+    }
+
+    /// <summary>Führt den Seek aus und gibt dem Gerät Zeit, bevor der Status wieder ausgewertet wird.</summary>
+    private async Task SeekNowAsync(double seconds)
+    {
         lock (sync)
+            ignoreStatusUntil = DateTime.UtcNow.AddSeconds(30);
+
+        try
         {
-            position = seconds;
-            startOffset = seconds;
-            startTime = DateTime.UtcNow;
-            stamp = DateTime.UtcNow;
+            await renderer.SeekAsync(seconds);
+            if (playing)
+                await renderer.ResumeAsync();
+        }
+        finally
+        {
+            lock (sync)
+            {
+                position = seconds;
+                startOffset = seconds;
+                startTime = DateTime.UtcNow;
+                stamp = DateTime.UtcNow;
+                ignoreStatusUntil = DateTime.UtcNow.AddSeconds(2);
+            }
         }
     }
 
@@ -189,7 +231,8 @@ internal sealed class RemoteAudioPlayer : IAudioPlayer
 
         lock (sync)
         {
-            position = CurrentPosition;
+            position = EstimatePosition();
+            stamp = DateTime.UtcNow;
             playing = false;
         }
 
@@ -213,20 +256,11 @@ internal sealed class RemoteAudioPlayer : IAudioPlayer
             renderer.Enqueue(renderer.StopAsync);
     }
 
+    /// <summary>Seeks (z. B. beim Ziehen des Reglers) werden zusammengefasst; nur die letzte Position wird gesendet.</summary>
     public void Seek(double seconds)
     {
         if (disposed)
             return;
-
-        if (!loaded || !IsReady)
-        {
-            lock (sync)
-            {
-                position = seconds;
-                stamp = DateTime.UtcNow;
-            }
-            return;
-        }
 
         lock (sync)
         {
@@ -234,10 +268,27 @@ internal sealed class RemoteAudioPlayer : IAudioPlayer
             startOffset = seconds;
             startTime = DateTime.UtcNow;
             stamp = DateTime.UtcNow;
+            ignoreStatusUntil = DateTime.UtcNow.AddSeconds(30);
         }
 
-        if (ReferenceEquals(renderer.Current, this))
-            renderer.Enqueue(() => renderer.SeekAsync(seconds));
+        if (!loaded || !IsReady)
+            return;
+
+        Volatile.Write(ref pendingSeek, seconds);
+        if (Interlocked.Exchange(ref seekQueued, 1) == 1)
+            return;
+
+        renderer.Enqueue(async () =>
+        {
+            // Kurz warten, damit weitere Reglerbewegungen zusammengefasst werden.
+            await Task.Delay(300);
+            Interlocked.Exchange(ref seekQueued, 0);
+            var target = Volatile.Read(ref pendingSeek);
+            if (target < 0 || disposed || !ReferenceEquals(renderer.Current, this))
+                return;
+
+            await SeekNowAsync(target);
+        });
     }
 
     public void Dispose()
