@@ -184,6 +184,9 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
 
             await FadeToAsync(0, cancellationToken);
             audioPlayer.Pause();
+#if ANDROID
+            CoverPlayerMP.Platforms.Android.PlaybackService.Stop();
+#endif
             IsPlaying = false;
             IsPaused = true;
             RaiseStateChanged();
@@ -401,6 +404,9 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
         {
         }
         audioPlayer = null;
+#if ANDROID
+        CoverPlayerMP.Platforms.Android.PlaybackService.Stop();
+#endif
         currentIndex = -1;
         IsPlaying = false;
         IsPaused = false;

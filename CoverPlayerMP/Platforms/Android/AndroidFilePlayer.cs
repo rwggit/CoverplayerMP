@@ -85,8 +85,11 @@ public sealed class AndroidFilePlayer : IAudioPlayer
 
     public void Play()
     {
-        if (!disposed)
-            player.Start();
+        if (disposed)
+            return;
+        try { PlaybackService.Start(); }
+        catch (Java.Lang.RuntimeException) { }
+        player.Start();
     }
 
     public void Pause()
