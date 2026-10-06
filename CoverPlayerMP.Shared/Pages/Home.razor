@@ -4,11 +4,24 @@
 @inject IJSRuntime Js
 @inject AppText Text
 @inject CoverSearch CoverSearcher
+@inject IServiceProvider Services
 
 <PageTitle>CoverPlayerMP</PageTitle>
 
 <div class="player-shell" @onclick="ShowControls">
     <div class="bottom-hotspot" @onmouseenter="ShowControls"></div>
+    @if (WindowControls is { } windowControls)
+    {
+        <div class="window-hotspot" @onmouseenter="UpdateWindowButtons">
+            @if (windowButtonsVisible)
+            {
+            <div class="window-buttons">
+                <button title="Restore" aria-label="Restore" @onclick="RestoreWindow" @onclick:stopPropagation="true">&#x2750;</button>
+                <button class="window-close" title="Close" aria-label="Close" @onclick="windowControls.Close" @onclick:stopPropagation="true">&times;</button>
+            </div>
+            }
+        </div>
+    }
     @if (!string.IsNullOrWhiteSpace(Player.ErrorMessage))
     {
         <div class="player-error" role="alert">@Player.ErrorMessage</div>
@@ -132,7 +145,7 @@
                                         </button>
                 </div>
                 </div>
-                <label class="setting-row setting-inline">
+                <label class="setting-row setting-inline volume-setting">
                     <span class="setting-icon"
                            title="@Text.Volume"
                            aria-label="@Text.Volume">🔊</span>
@@ -563,6 +576,16 @@
 
 @code {
     private bool controlsVisible;
+    private IWindowControls? WindowControls => (IWindowControls?)Services.GetService(typeof(IWindowControls));
+    private bool windowButtonsVisible;
+
+    private void UpdateWindowButtons() => windowButtonsVisible = WindowControls?.IsFullScreen == true;
+
+    private void RestoreWindow()
+    {
+        WindowControls?.Restore();
+        windowButtonsVisible = false;
+    }
     private int editorCoverSize = 5;
     private string? coverUri;
     private string? coverSource;

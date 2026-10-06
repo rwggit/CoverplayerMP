@@ -24,8 +24,25 @@ public partial class App : Application
             var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(nativeWindow);
             var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
             var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
-            if (appWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
-                presenter.SetBorderAndTitleBar(false, false);
+
+            void UpdateTitleBar()
+            {
+                switch (appWindow.Presenter)
+                {
+                    case Microsoft.UI.Windowing.OverlappedPresenter presenter:
+                        var maximized = presenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Maximized;
+                        if (presenter.HasTitleBar == maximized)
+                            presenter.SetBorderAndTitleBar(!maximized, !maximized);
+                        break;
+                }
+            }
+
+            appWindow.Changed += (_, args) =>
+            {
+                if (args.DidPresenterChange || args.DidSizeChange)
+                    nativeWindow.DispatcherQueue.TryEnqueue(UpdateTitleBar);
+            };
+            UpdateTitleBar();
         };
 #endif
         return window;
