@@ -11,6 +11,7 @@ public interface IPlaylistPlayer : IAsyncDisposable
     double Duration { get; }
     double Volume { get; set; }
     double CrossfadeSeconds { get; set; }
+    bool SupportsCrossfade => true;
     bool IsPlaying { get; }
     bool IsPaused { get; }
     string? ErrorMessage { get; }

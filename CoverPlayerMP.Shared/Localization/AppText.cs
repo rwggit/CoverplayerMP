@@ -115,7 +115,9 @@ public sealed class AppText
     public string NoCoverPictures => T("Keine Cover-Bilder vorhanden.", "No cover pictures available.", "Aucune pochette disponible.");
 
     // Einstellungen
-    public string Crossfade => T("Überblendung", "Crossfade", "Fondu enchaîné");
+    public string Crossfade => T("Überblendung Lautstärke", "Volume crossfade", "Fondu enchaîné du volume");
+    public string CrossfadeUnsupported => T("Das aktuelle Ausgabegerät erlaubt keine Überblendung.", "The current output device does not support crossfading.", "Le périphérique de sortie actuel ne permet pas le fondu enchaîné.");
+    public string CoverFade => T("Überblendung Cover", "Cover crossfade", "Fondu enchaîné de la pochette");
     public string CrossfadeTooltip(string seconds) => T($"Dauer der Überblendung: {seconds} Sekunden", $"Crossfade duration: {seconds} seconds", $"Durée du fondu enchaîné : {seconds} secondes");
     public string CoverSize => T("Cover-Größe", "Cover size", "Taille des pochettes");
     public string CoverSizeTooltip(int size) => T($"Größe der Cover in der Playlistbearbeitung: {size} rem", $"Cover size in playlist editor: {size} rem", $"Taille des pochettes dans l’éditeur de playlist : {size} rem");

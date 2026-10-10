@@ -458,8 +458,21 @@
                         <input type="range" min="0" max="5" step="0.1"
                                title="@Text.CrossfadeTooltip(Player.CrossfadeSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))"
                                value="@Player.CrossfadeSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                               disabled="@(!Player.SupportsCrossfade)"
                                @oninput="OnCrossfadeChanged" />
                         <span class="setting-value">@Player.CrossfadeSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) s</span>
+                        @if (!Player.SupportsCrossfade)
+                        {
+                            <small class="setting-hint">@Text.CrossfadeUnsupported</small>
+                        }
+                    </label>
+                    <label class="setting-row">
+                        <span>@Text.CoverFade</span>
+                        <input type="range" min="0" max="5" step="0.1"
+                               title="@Text.CrossfadeTooltip(coverFadeSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))"
+                               value="@coverFadeSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                               @oninput="OnCoverFadeChanged" />
+                        <span class="setting-value">@coverFadeSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) s</span>
                     </label>
                     <label class="setting-row">
                         <span>@Text.CoverSize</span>
@@ -916,7 +929,7 @@
             if (coverChanged && !disposed)
             {
                 coverChanged = false;
-                var duration = (int)Math.Round(Math.Max(0.6, Player.CrossfadeSeconds) * 1000);
+                var duration = (int)Math.Round(Math.Max(0.6, coverFadeSeconds) * 1000);
                 await Js.InvokeVoidAsync("coverTransition.show", coverCanvas, coverUri, duration);
             }
 
@@ -934,6 +947,8 @@
     }
 
     private const string CrossfadeKey = "coverPlayer.crossfadeSeconds";
+    private const string CoverFadeKey = "coverPlayer.coverFadeSeconds";
+    private double coverFadeSeconds = 2;
     private const string EditorCoverSizeKey = "coverPlayer.editorCoverSize";
     private const string LanguageKey = "coverPlayer.language";
 
@@ -975,6 +990,11 @@
             if (double.TryParse(crossfade, System.Globalization.NumberStyles.Float,
                     System.Globalization.CultureInfo.InvariantCulture, out var seconds))
                 Player.CrossfadeSeconds = Math.Clamp(seconds, 0, 5);
+
+            var coverFade = await Js.InvokeAsync<string?>("localStorage.getItem", CoverFadeKey);
+            if (double.TryParse(coverFade, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var fadeSeconds))
+                coverFadeSeconds = Math.Clamp(fadeSeconds, 0, 5);
 
             var coverSize = await Js.InvokeAsync<string?>("localStorage.getItem", EditorCoverSizeKey);
             if (int.TryParse(coverSize, out var size))
@@ -1705,6 +1725,19 @@
             Player.CrossfadeSeconds = Math.Clamp(value, 0, 5);
             await SaveSettingAsync(CrossfadeKey,
                 Player.CrossfadeSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+    }
+
+    private async Task OnCoverFadeChanged(ChangeEventArgs args)
+    {
+        if (double.TryParse(args.Value?.ToString(),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var value))
+        {
+            coverFadeSeconds = Math.Clamp(value, 0, 5);
+            await SaveSettingAsync(CoverFadeKey,
+                coverFadeSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
     }
 

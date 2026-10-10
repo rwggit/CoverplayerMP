@@ -238,6 +238,9 @@
 }
 
 .timeline-row input, .setting-row input { flex: 1; }
+
+.setting-row { flex-wrap: wrap; }
+.setting-hint { flex: 0 0 100%; opacity: .7; }
 .control-toolbar {
     display: flex;
     flex-wrap: wrap;

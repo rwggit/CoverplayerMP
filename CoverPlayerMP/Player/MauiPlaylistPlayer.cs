@@ -51,9 +51,10 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
     }
     public double CrossfadeSeconds
     {
-        get => crossfadeSeconds;
+        get => renderer is null ? crossfadeSeconds : 0;
         set => crossfadeSeconds = Math.Clamp(value, 0, 5);
     }
+    public bool SupportsCrossfade => renderer is null;
     public bool IsPlaying { get; private set; }
     public bool IsPaused { get; private set; }
     public string? ErrorMessage { get; private set; }
@@ -657,7 +658,7 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
                 if (audioPlayer is not null &&
                     IsPlaying &&
                     Duration > 0 &&
-                    Position >= Duration - Math.Max(.2, crossfadeSeconds))
+                    Position >= Duration - Math.Max(.2, CrossfadeSeconds))
                 {
                     await TransitionByAsync(1, token);
                 }
@@ -706,7 +707,7 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
 
         try
         {
-            var duration = Math.Max(.05, crossfadeSeconds);
+            var duration = Math.Max(.05, CrossfadeSeconds);
             for (var step = 0; step < 20; step++)
             {
                 token.ThrowIfCancellationRequested();
@@ -775,7 +776,7 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
         if (audioPlayer is null)
             return;
         var start = audioPlayer.Volume;
-        var duration = Math.Max(.05, crossfadeSeconds);
+        var duration = Math.Max(.05, CrossfadeSeconds);
         for (var step = 0; step < 20; step++)
         {
             audioPlayer.Volume = start + (target - start) * ((step + 1) / 20d);
