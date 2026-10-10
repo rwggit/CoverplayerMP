@@ -15,6 +15,14 @@ public interface IPlaylistPlayer : IAsyncDisposable
     bool IsPlaying { get; }
     bool IsPaused { get; }
     string? ErrorMessage { get; }
+    bool NeedsMusicFolder => false;
+    Task SelectMusicFolderAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    Task SelectAudioFilesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    bool SupportsServerPlaylist => false;
+    Task<IReadOnlyList<ServerEntry>> ListServerFolderAsync(string folderUrl, string? user, string? password, bool trustCertificate = false, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<ServerEntry>>([]);
+    IReadOnlyList<string> MissingFiles => [];
+    Task OpenServerPlaylistAsync(string playlistUrl, string? user, string? password, bool trustCertificate = false, CancellationToken cancellationToken = default) => Task.CompletedTask;
     bool SupportsRemotePlayback => false;
     RemoteDevice? ActiveDevice => null;
     Task<IReadOnlyList<RemoteDevice>> GetRemoteDevicesAsync(CancellationToken cancellationToken = default) =>

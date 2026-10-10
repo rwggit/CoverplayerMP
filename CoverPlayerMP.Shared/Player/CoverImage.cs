@@ -30,6 +30,32 @@ public static class CoverImage
         return $"data:image/jpeg;base64,{Convert.ToBase64String(encoded.ToArray())}";
     }
 
+    public static bool HasEmbeddedArtwork(string path) => ReadEmbeddedArtwork(path) is not null;
+
+    // Liefert eine Bilddatei für das Cover: die Datei selbst, wenn sie ein Bild ist, sonst das eingebettete
+    // oder ein benachbartes Cover, als Datei im angegebenen Ordner abgelegt (z. B. für DLNA-Geräte).
+    public static string? GetCoverImageFile(string? path, string cacheDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
+            return null;
+        if (IsImageFile(path))
+            return path;
+
+        var bytes = ReadEmbeddedArtwork(path) ?? ReadExternalArtwork(path);
+        if (bytes is null || bytes.Length == 0)
+            return null;
+
+        var extension = bytes.Length > 4 && bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47
+            ? ".png"
+            : ".jpg";
+        var key = path + "|" + new FileInfo(path).Length;
+        var name = "dlna_cover_" + Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(System.Text.Encoding.UTF8.GetBytes(key))) + extension;
+        var target = Path.Combine(cacheDirectory, name);
+        if (!System.IO.File.Exists(target))
+            System.IO.File.WriteAllBytes(target, bytes);
+        return target;
+    }
+
     private static bool IsImageFile(string path) =>
         Path.GetExtension(path).ToLowerInvariant() is
             ".jpg" or ".jpeg" or ".png" or ".webp" or ".tif" or ".tiff" or ".gif" or ".bmp";

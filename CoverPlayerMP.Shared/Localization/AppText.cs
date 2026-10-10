@@ -178,6 +178,30 @@ public sealed class AppText
         $"The playlist location could not be determined: {uri}",
         $"L’emplacement de la playlist n’a pas pu être déterminé : {uri}");
     public string ErrorOpenPlaylist(string message) => T($"Playlist konnte nicht geöffnet werden: {message}", $"Playlist could not be opened: {message}", $"Impossible d’ouvrir la playlist : {message}");
+    public string MissingTracksHint(int count) => T($"{count} Audiodateien der Playlist wurden nicht gefunden. Wähle den Musikordner oder die Audiodateien.", $"{count} audio files of the playlist were not found. Select the music folder or the audio files.", $"{count} fichiers audio de la playlist sont introuvables. Choisissez le dossier de musique ou les fichiers audio.");
+    public string MissingFilesLabel => T("Nicht gefundene Dateien", "Files not found", "Fichiers introuvables");
+    public string OpenPlaylistFromServer => T("Playlist vom Server öffnen (WebDAV)", "Open playlist from server (WebDAV)", "Ouvrir la playlist depuis un serveur (WebDAV)");
+    public string SelectAudioFiles => T("Audiodateien wählen", "Select audio files", "Choisir les fichiers audio");
+    public string ServerButton => T("Server (WebDAV)", "Server (WebDAV)", "Serveur (WebDAV)");
+    public string ServerDialogTitle => T("Playlist vom Server öffnen", "Open playlist from server", "Ouvrir la playlist depuis un serveur");
+    public string ServerUrl => T("Server, z. B. nas:5006 (zeigt die Freigaben)", "Server, e.g. nas:5006 (shows the shares)", "Serveur, p. ex. nas:5006 (affiche les partages)");
+    public string ServerUser => T("Benutzer (optional)", "User (optional)", "Utilisateur (facultatif)");
+    public string ServerTrustCertificate => T("Zertifikat dieses Servers akzeptieren (selbstsigniert)", "Accept this server's certificate (self-signed)", "Accepter le certificat de ce serveur (auto-signé)");
+    public string ServerPassword => T("Passwort", "Password", "Mot de passe");
+    public string ServerHint => T("Die Playlist und ihre relativen Pfade werden von diesem Server geladen. Zugangsdaten gehen nur an diesen Server.", "The playlist and its relative paths are loaded from this server. Credentials are sent only to this server.", "La playlist et ses chemins relatifs sont chargés depuis ce serveur. Les identifiants ne sont envoyés qu’à ce serveur.");
+    public string Connect => T("Verbinden", "Connect", "Se connecter");
+        public string ServerUp => T("Eine Ebene höher", "Up one level", "Niveau supérieur");
+        public string ServerEmpty => T("Keine Ordner oder Playlists gefunden.", "No folders or playlists found.", "Aucun dossier ni playlist trouvé.");
+        public string ServerLoading => T("Wird geladen …", "Loading …", "Chargement …");
+        public string ServerChoosePlaylist => T("Playlist auswählen", "Choose a playlist", "Choisir une playlist");
+    public string ErrorInvalidServerUrl => T("Bitte eine gültige http- oder https-Adresse angeben.", "Please enter a valid http or https address.", "Veuillez saisir une adresse http ou https valide.");
+    public string ErrorServerFile(string url, int status) => T($"Der Server liefert {url} nicht (Status {status}).", $"The server does not deliver {url} (status {status}).", $"Le serveur ne fournit pas {url} (statut {status}).");
+    public string MusicSourceNeeded(int count) => T($"Für {count} Titel der Playlist fehlen die Audiodateien. Wähle den Musikordner, einzelne Audiodateien oder einen Server.", $"The audio files for {count} playlist tracks are missing. Select the music folder, individual audio files or a server.", $"Les fichiers audio de {count} morceaux de la playlist manquent. Choisissez le dossier de musique, des fichiers audio ou un serveur.");
+    public string SelectMusicFolder => T("Musikordner wählen", "Select music folder", "Choisir le dossier de musique");
+    public string MusicFolderNeeded(int count) => T(
+        $"Für {count} Titel der Playlist wurden die Audiodateien nicht gefunden. Bitte den Ordner wählen, der die Musikdateien enthält.",
+        $"The audio files for {count} playlist tracks were not found. Please select the folder that contains the music files.",
+        $"Les fichiers audio de {count} morceaux de la playlist sont introuvables. Veuillez choisir le dossier contenant les fichiers de musique.");
     public string PickPlaylistTitle => T("M3U-Playlist auswählen", "Select M3U playlist", "Choisir une playlist M3U");
     public string ErrorEmptyPlaylist => T("Die Playlist enthält keine abspielbaren Titel.", "The playlist contains no playable tracks.", "La playlist ne contient aucun morceau lisible.");
     public string ErrorReadPlaylist(string message) => T($"Playlist konnte nicht gelesen werden: {message}", $"Playlist could not be read: {message}", $"Impossible de lire la playlist : {message}");

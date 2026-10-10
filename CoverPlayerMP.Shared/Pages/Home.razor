@@ -22,9 +22,71 @@
             }
         </div>
     }
-    @if (!string.IsNullOrWhiteSpace(Player.ErrorMessage))
+    @if (!string.IsNullOrWhiteSpace(Player.ErrorMessage) || Player.NeedsMusicFolder)
     {
-        <div class="player-error" role="alert">@Player.ErrorMessage</div>
+        <div class="player-error" role="alert" @onclick:stopPropagation="true">
+            <div>@Player.ErrorMessage</div>
+            @if (Player.NeedsMusicFolder)
+            {
+                <select class="missing-files" size="5" aria-label="@Text.MissingFilesLabel" title="@Text.MissingFilesLabel">
+                                    @foreach (var missing in Player.MissingFiles)
+                                    {
+                                        <option>@missing</option>
+                                    }
+                                </select>
+                                <div class="player-error-actions">
+                                <button @onclick="PickMusicFolderAsync" @onclick:stopPropagation="true">@Text.SelectMusicFolder</button>
+                                <button @onclick="PickAudioFilesAsync" @onclick:stopPropagation="true">@Text.SelectAudioFiles</button>
+                                </div>
+            }
+        </div>
+    }
+    @if (serverDialogVisible)
+    {
+        <div class="insert-overlay" @onclick:stopPropagation="true">
+            <section class="insert-dialog">
+                <div class="control-dialog-header">
+                    <span>@Text.ServerDialogTitle</span>
+                    <button class="close-button" title="@Text.Close" @onclick="() => serverDialogVisible = false">&times;</button>
+                </div>
+                @if (serverEntries is null)
+                {
+                    <input placeholder="@Text.ServerUrl" @bind="serverUrl" @bind:event="oninput" />
+                    <input placeholder="@Text.ServerUser" @bind="serverUser" @bind:event="oninput" />
+                    <input type="password" placeholder="@Text.ServerPassword" @bind="serverPassword" @bind:event="oninput" />
+                    <small class="setting-hint">@Text.ServerHint</small>
+                    <label class="setting-hint"><input type="checkbox" @bind="serverTrustCertificate" /> @Text.ServerTrustCertificate</label>
+                    @if (serverError is not null)
+                    {
+                        <small class="setting-hint" role="alert">@serverError</small>
+                    }
+                    <button class="play-button" disabled="@serverBusy" @onclick="ConnectServerAsync">@(serverBusy ? Text.ServerLoading : Text.Connect)</button>
+                }
+                else
+                {
+                    <span class="server-path">@serverFolder</span>
+                    @if (serverError is not null)
+                    {
+                        <small class="setting-hint" role="alert">@serverError</small>
+                    }
+                    <div class="server-list" aria-label="@Text.ServerChoosePlaylist">
+                        @if (ServerParentUrl is { } parentUrl)
+                        {
+                            <button disabled="@serverBusy" @onclick="() => BrowseServerAsync(parentUrl)">↑ @Text.ServerUp</button>
+                        }
+                        @foreach (var entry in serverEntries)
+                        {
+                            var current = entry;
+                            <button disabled="@serverBusy" @onclick="() => OpenServerEntryAsync(current)">@(current.IsFolder ? "📁 " : "♪ ")@current.Name</button>
+                        }
+                        @if (serverEntries.Count == 0)
+                        {
+                            <span>@Text.ServerEmpty</span>
+                        }
+                    </div>
+                }
+            </section>
+        </div>
     }
     <div class="cover-stage"
          @onpointerdown="OnSwipeStart"
@@ -84,7 +146,17 @@
                                                 <path d="M5.6 11a1 1 0 0 1 .9-.7h15.2a.8.8 0 0 1 .8 1l-2.1 7a1 1 0 0 1-1 .7H3.8a.8.8 0 0 1-.8-1z" />
                                             </svg>
                                         </button>
-                <button @onclick="OpenEditor" disabled="@(Player.Tracks.Count == 0)"
+                @if (Player.SupportsServerPlaylist)
+                                {
+                                    <button @onclick="() => serverDialogVisible = true"
+                                            title="@Text.OpenPlaylistFromServer" aria-label="@Text.OpenPlaylistFromServer">
+                                        <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor"
+                                             aria-hidden="true" focusable="false" style="vertical-align: -0.125em;">
+                                            <path d="M6.5 19a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 17.4 9.1 4.5 4.5 0 0 1 17.5 19z" />
+                                        </svg>
+                                    </button>
+                                }
+                                <button @onclick="OpenEditor" disabled="@(Player.Tracks.Count == 0)"
                         title="@Text.EditPlaylist" aria-label="@Text.EditPlaylist">
                     <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor"
                          aria-hidden="true" focusable="false" style="vertical-align: -0.125em;">
@@ -594,6 +666,87 @@
 
     private void UpdateWindowButtons() => windowButtonsVisible = WindowControls?.IsFullScreen == true;
 
+    private Task PickMusicFolderAsync() => Player.SelectMusicFolderAsync();
+
+    private Task PickAudioFilesAsync() => Player.SelectAudioFilesAsync();
+
+    private bool serverDialogVisible;
+    private string serverUrl = string.Empty;
+    private string serverUser = string.Empty;
+    private string serverPassword = string.Empty;
+    private bool serverTrustCertificate;
+
+    private List<ServerEntry>? serverEntries;
+    private string serverFolder = string.Empty;
+    private bool serverBusy;
+    private string? serverError;
+
+    private string? ServerParentUrl
+    {
+        get
+        {
+            if (!Uri.TryCreate(serverFolder, UriKind.Absolute, out var folder) || folder.AbsolutePath.TrimEnd('/').Length == 0)
+                return null;
+            var path = folder.AbsolutePath.TrimEnd('/');
+            return new Uri(folder, path[..(path.LastIndexOf('/') + 1)]).AbsoluteUri;
+        }
+    }
+
+    private async Task ConnectServerAsync()
+    {
+        await SaveSettingAsync(ServerUrlKey, serverUrl.Trim());
+        await SaveSettingAsync(ServerUserKey, serverUser.Trim());
+        await BrowseServerAsync(NormalizeServerUrl(serverUrl));
+    }
+
+    private static string NormalizeServerUrl(string value)
+    {
+        var trimmed = value.Trim();
+        return trimmed.Length == 0 || trimmed.Contains("://", StringComparison.Ordinal) ? trimmed : "https://" + trimmed;
+    }
+
+    private async Task BrowseServerAsync(string folderUrl)
+    {
+        serverBusy = true;
+        serverError = null;
+        try
+        {
+            var entries = await Player.ListServerFolderAsync(folderUrl, serverUser, serverPassword, serverTrustCertificate);
+            serverEntries = entries.ToList();
+            serverFolder = folderUrl.EndsWith('/') ? folderUrl : folderUrl + "/";
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException
+                                       or UriFormatException or System.Xml.XmlException)
+        {
+            serverError = DescribeException(ex);
+        }
+        finally
+        {
+            serverBusy = false;
+        }
+    }
+
+    private static string DescribeException(Exception ex)
+    {
+        var messages = new List<string>();
+        for (var current = ex; current is not null; current = current.InnerException)
+            if (!messages.Contains(current.Message))
+                messages.Add(current.Message);
+        return string.Join(" → ", messages);
+    }
+
+    private async Task OpenServerEntryAsync(ServerEntry entry)
+    {
+        if (entry.IsFolder)
+        {
+            await BrowseServerAsync(entry.Url);
+            return;
+        }
+
+        serverDialogVisible = false;
+        await Player.OpenServerPlaylistAsync(entry.Url, serverUser, serverPassword, serverTrustCertificate);
+    }
+
     private void RestoreWindow()
     {
         WindowControls?.Restore();
@@ -951,6 +1104,8 @@
     private double coverFadeSeconds = 2;
     private const string EditorCoverSizeKey = "coverPlayer.editorCoverSize";
     private const string LanguageKey = "coverPlayer.language";
+    private const string ServerUrlKey = "coverPlayer.serverUrl";
+    private const string ServerUserKey = "coverPlayer.serverUser";
 
     private async Task OnLanguageChanged(ChangeEventArgs args)
     {
@@ -1003,6 +1158,9 @@
             var language = await Js.InvokeAsync<string?>("localStorage.getItem", LanguageKey);
             if (Enum.TryParse<AppLanguage>(language, out var appLanguage))
                 Text.Language = appLanguage;
+            serverUrl = await Js.InvokeAsync<string?>("localStorage.getItem", ServerUrlKey) ?? serverUrl;
+            serverUser = await Js.InvokeAsync<string?>("localStorage.getItem", ServerUserKey) ?? serverUser;
+
             await Js.InvokeVoidAsync("document.documentElement.setAttribute", "lang", Text.Code);
 
             StateHasChanged();
@@ -1464,17 +1622,22 @@
         }
     }
 
+    // Schlüssel enthält die CoverSource: Server-Titel haben zunächst eine URL (kein Cover). Sobald der Titel
+    // heruntergeladen ist, zeigt CoverSource auf die lokale Datei, und das Cover wird neu geladen.
+    private static string EditorDetailsKey(Track track) => track.Source + "|" + (track.CoverSource ?? string.Empty);
+
     private EditorDetails GetEditorDetails(Track track)
     {
-        if (editorDetails.TryGetValue(track.Source, out var details))
+        var key = EditorDetailsKey(track);
+        if (editorDetails.TryGetValue(key, out var details))
             return details;
 
-        if (editorDetailsLoading.Add(track.Source))
-            _ = LoadEditorDetailsAsync(track);
+        if (editorDetailsLoading.Add(key))
+            _ = LoadEditorDetailsAsync(track, key);
         return EmptyDetails;
     }
 
-    private async Task LoadEditorDetailsAsync(Track track)
+    private async Task LoadEditorDetailsAsync(Track track, string key)
     {
         var details = await Task.Run(() =>
         {
@@ -1489,9 +1652,12 @@
             }
             try
             {
-                if (File.Exists(track.Source))
+                var audioFile = File.Exists(track.Source) ? track.Source
+                    : track.CoverSource is { } local && File.Exists(local) ? local
+                    : null;
+                if (audioFile is not null)
                 {
-                    using var file = TagLib.File.Create(track.Source);
+                    using var file = TagLib.File.Create(audioFile);
                     if (file.Properties is { } props && props.Duration > TimeSpan.Zero)
                         duration = props.Duration;
                 }
@@ -1506,8 +1672,8 @@
             return;
         await InvokeAsync(() =>
         {
-            editorDetails[track.Source] = details;
-            editorDetailsLoading.Remove(track.Source);
+            editorDetails[key] = details;
+            editorDetailsLoading.Remove(key);
             StateHasChanged();
         });
     }

@@ -11,6 +11,63 @@ public static class PlaylistDocumentPicker
 {
     public const int RequestCode = 4711;
     public const int SaveRequestCode = 4712;
+    public const int TreeRequestCode = 4713;
+    private static TaskCompletionSource<AndroidUri?>? pendingTree;
+
+    public static AndroidUri? FindPersistedTree(Context context, string? authority)
+    {
+        var permissions = context.ContentResolver?.PersistedUriPermissions;
+        if (permissions is null)
+            return null;
+
+        foreach (var permission in permissions)
+        {
+            var uri = permission.Uri;
+            if (uri is not null && permission.IsReadPermission && DocumentsContract.IsTreeUri(uri) &&
+                string.Equals(uri.Authority, authority, StringComparison.Ordinal))
+                return uri;
+        }
+
+        return null;
+    }
+
+    public static Task<AndroidUri?> PickTreeAsync(AndroidUri? initialLocation)
+    {
+        var activity = Platform.CurrentActivity
+            ?? throw new InvalidOperationException("Keine aktive Android-Activity.");
+
+        pendingTree?.TrySetResult(null);
+        pendingTree = new TaskCompletionSource<AndroidUri?>();
+
+        var intent = new Intent(Intent.ActionOpenDocumentTree);
+        intent.AddFlags(ActivityFlags.GrantReadUriPermission | ActivityFlags.GrantPersistableUriPermission | ActivityFlags.GrantPrefixUriPermission);
+        if (initialLocation is not null && OperatingSystem.IsAndroidVersionAtLeast(26))
+            intent.PutExtra(DocumentsContract.ExtraInitialUri, initialLocation);
+        activity.StartActivityForResult(intent, TreeRequestCode);
+        return pendingTree.Task;
+    }
+    public const int AudioRequestCode = 4714;
+    private static TaskCompletionSource<IReadOnlyList<AndroidUri>>? pendingAudio;
+
+    public static Task<IReadOnlyList<AndroidUri>> PickAudioFilesAsync(AndroidUri? initialLocation)
+    {
+        var activity = Platform.CurrentActivity
+            ?? throw new InvalidOperationException("Keine aktive Android-Activity.");
+
+        pendingAudio?.TrySetResult([]);
+        pendingAudio = new TaskCompletionSource<IReadOnlyList<AndroidUri>>();
+
+        var intent = new Intent(Intent.ActionOpenDocument);
+        intent.AddCategory(Intent.CategoryOpenable);
+        intent.AddFlags(ActivityFlags.GrantReadUriPermission | ActivityFlags.GrantPersistableUriPermission);
+        intent.SetType("audio/*");
+        intent.PutExtra(Intent.ExtraAllowMultiple, true);
+        if (initialLocation is not null && OperatingSystem.IsAndroidVersionAtLeast(26))
+            intent.PutExtra(DocumentsContract.ExtraInitialUri, initialLocation);
+        activity.StartActivityForResult(intent, AudioRequestCode);
+        return pendingAudio.Task;
+    }
+
     private static TaskCompletionSource<AndroidUri?>? pending;
     private static TaskCompletionSource<AndroidUri?>? pendingSave;
 
@@ -53,6 +110,61 @@ public static class PlaylistDocumentPicker
 
     public static void OnActivityResult(int requestCode, Result resultCode, Intent? data)
     {
+        if (requestCode == TreeRequestCode)
+        {
+            var tree = resultCode == Result.Ok ? data?.Data : null;
+            if (tree is not null)
+            {
+                try
+                {
+                    global::Android.App.Application.Context.ContentResolver?.TakePersistableUriPermission(
+                        tree, ActivityFlags.GrantReadUriPermission);
+                }
+                catch (Java.Lang.SecurityException)
+                {
+                }
+            }
+
+            pendingTree?.TrySetResult(tree);
+            pendingTree = null;
+            return;
+        }
+
+        if (requestCode == AudioRequestCode)
+        {
+            var files = new List<AndroidUri>();
+            if (resultCode == Result.Ok && data is not null)
+            {
+                if (data.ClipData is { } clip)
+                {
+                    for (var i = 0; i < clip.ItemCount; i++)
+                    {
+                        var item = clip.GetItemAt(i)?.Uri;
+                        if (item is not null)
+                            files.Add(item);
+                    }
+                }
+                else if (data.Data is { } single)
+                    files.Add(single);
+            }
+
+            foreach (var file in files)
+            {
+                try
+                {
+                    global::Android.App.Application.Context.ContentResolver?.TakePersistableUriPermission(
+                        file, ActivityFlags.GrantReadUriPermission);
+                }
+                catch (Java.Lang.SecurityException)
+                {
+                }
+            }
+
+            pendingAudio?.TrySetResult(files);
+            pendingAudio = null;
+            return;
+        }
+
         if (requestCode == SaveRequestCode)
         {
             pendingSave?.TrySetResult(resultCode == Result.Ok ? data?.Data : null);

@@ -38,8 +38,9 @@ internal sealed class RemoteAudioPlayer : IAudioPlayer
         artist = track.Artist ?? string.Empty;
         contentType = MediaFileServer.GetContentType(track.Source);
         url = server.Register(track.Source, renderer.Host);
-        if (!string.IsNullOrEmpty(track.CoverSource) && File.Exists(track.CoverSource))
-            coverUrl = server.Register(track.CoverSource, renderer.Host);
+        var coverFile = CoverImage.GetCoverImageFile(track.CoverSource, FileSystem.CacheDirectory);
+        if (coverFile is not null)
+            coverUrl = server.Register(coverFile, renderer.Host);
     }
 
     public bool IsReady { get; private set; }

@@ -51,19 +51,36 @@ internal sealed class DlnaRenderer(Uri descriptionLocation) : RemoteRenderer
             .Append("xmlns:dc=\"http://purl.org/dc/elements/1.1/\" ")
             .Append("xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\">")
             .Append("<item id=\"0\" parentID=\"-1\" restricted=\"1\">")
-            .Append("<dc:title>").Append(SecurityElement.Escape(title)).Append("</dc:title>")
-            .Append("<dc:creator>").Append(SecurityElement.Escape(artist)).Append("</dc:creator>")
-            .Append("<upnp:artist>").Append(SecurityElement.Escape(artist)).Append("</upnp:artist>")
+            .Append("<dc:title>").Append(EscapeDidl(title)).Append("</dc:title>")
+            .Append("<dc:creator>").Append(EscapeDidl(artist)).Append("</dc:creator>")
+            .Append("<upnp:artist>").Append(EscapeDidl(artist)).Append("</upnp:artist>")
             .Append("<upnp:class>object.item.audioItem.musicTrack</upnp:class>");
         if (coverUrl is not null)
-            didl.Append("<upnp:albumArtURI>").Append(SecurityElement.Escape(coverUrl)).Append("</upnp:albumArtURI>");
+            didl.Append("<upnp:albumArtURI>").Append(EscapeDidl(coverUrl)).Append("</upnp:albumArtURI>");
         didl.Append("<res protocolInfo=\"http-get:*:").Append(contentType).Append(":*\">")
-            .Append(SecurityElement.Escape(url)).Append("</res></item></DIDL-Lite>");
+            .Append(EscapeDidl(url)).Append("</res></item></DIDL-Lite>");
+
+        // Nur DLNA: Manche Renderer lehnen SetAVTransportURI während der Wiedergabe ab (UPnP 705).
+        // Fehler hier ignorieren, das Gerät kann bereits gestoppt sein.
+        try
+        {
+            await SendAsync(avTransportUrl!, AvTransport, "Stop", ("InstanceID", "0"));
+        }
+        catch (InvalidOperationException)
+        {
+        }
 
         await SendAsync(avTransportUrl!, AvTransport, "SetAVTransportURI",
             ("InstanceID", "0"), ("CurrentURI", url), ("CurrentURIMetaData", didl.ToString()));
         await SendAsync(avTransportUrl!, AvTransport, "Play", ("InstanceID", "0"), ("Speed", "1"));
     }
+
+    // Nur &, < und > maskieren. SecurityElement.Escape erzeugt &apos; und &quot;, was manche DLNA-Geräte mit HTTP 500 ablehnen.
+    private static string EscapeDidl(string? value) =>
+        (value ?? string.Empty)
+            .Replace("&", "&amp;")
+            .Replace("<", "&lt;")
+            .Replace(">", "&gt;");
 
     public override Task ResumeAsync() =>
         SendAsync(avTransportUrl!, AvTransport, "Play", ("InstanceID", "0"), ("Speed", "1"));
@@ -134,6 +151,21 @@ internal sealed class DlnaRenderer(Uri descriptionLocation) : RemoteRenderer
     private static string? Value(XDocument? document, string name) =>
         document?.Descendants().FirstOrDefault(e => e.Name.LocalName == name)?.Value;
 
+    private static string DescribeUpnpError(string text)
+    {
+        try
+        {
+            var error = XDocument.Parse(text).Descendants().FirstOrDefault(e => e.Name.LocalName == "UPnPError");
+            var code = error?.Elements().FirstOrDefault(e => e.Name.LocalName == "errorCode")?.Value;
+            var description = error?.Elements().FirstOrDefault(e => e.Name.LocalName == "errorDescription")?.Value;
+            return code is null ? string.Empty : $" (UPnP {code}: {description})";
+        }
+        catch (Exception)
+        {
+            return string.Empty;
+        }
+    }
+
     private static async Task<XDocument?> SendAsync(Uri url, string service, string action, params (string Name, string Value)[] arguments)
     {
         var body = new StringBuilder();
@@ -154,7 +186,7 @@ internal sealed class DlnaRenderer(Uri descriptionLocation) : RemoteRenderer
         using var response = await Http.SendAsync(request);
         var text = await response.Content.ReadAsStringAsync();
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"{action}: HTTP {(int)response.StatusCode}");
+            throw new InvalidOperationException($"{action}: HTTP {(int)response.StatusCode}{DescribeUpnpError(text)}");
 
         return string.IsNullOrWhiteSpace(text) ? null : XDocument.Parse(text);
     }

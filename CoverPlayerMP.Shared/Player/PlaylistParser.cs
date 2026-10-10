@@ -45,7 +45,9 @@ public static class PlaylistParser
             var source = NormalizeSeparators(line);
             var isRelative = !Uri.TryCreate(source, UriKind.Absolute, out var uri) && !Path.IsPathRooted(source);
             if (isRelative && baseDirectory is not null)
-                source = Path.GetFullPath(Path.Combine(baseDirectory, source));
+                source = IsHttpUrl(baseDirectory)
+                    ? new Uri(new Uri(baseDirectory.TrimEnd('/') + "/"), line.Replace('\\', '/')).ToString()
+                    : Path.GetFullPath(Path.Combine(baseDirectory, source));
             else
                 isRelative = false;
 
@@ -61,6 +63,9 @@ public static class PlaylistParser
         return result;
     }
 
+    public static bool IsHttpUrl(string? value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https";
+
     private static string NormalizeSeparators(string path)
     {
         // Web-Adressen nicht anfassen – dort ist '/' Teil der Adresse
@@ -74,7 +79,7 @@ public static class PlaylistParser
     private static bool IsTrackSource(string line)
     {
         if (Uri.TryCreate(line, UriKind.Absolute, out var uri) &&
-            (uri.IsFile || uri.Scheme is "http" or "https"))
+            (uri.IsFile || uri.Scheme is "http" or "https" or "smb" or "nfs"))
             return true;
 
         var extension = Path.GetExtension(line);

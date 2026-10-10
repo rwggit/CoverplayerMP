@@ -102,7 +102,7 @@ public sealed partial class MauiPlaylistPlayer
                 _ = oldRenderer.DisposeAsync().AsTask();
             }
 
-            if (!isDisposed && currentIndex >= 0 && currentIndex < tracks.Count && File.Exists(tracks[currentIndex].Source))
+            if (!isDisposed && currentIndex >= 0 && currentIndex < tracks.Count && SourceExists(tracks[currentIndex].Source))
             {
                 var next = await CreatePlayerAsync(tracks[currentIndex].Source, CancellationToken.None);
                 next.Volume = volume;

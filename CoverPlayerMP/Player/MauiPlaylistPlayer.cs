@@ -58,6 +58,7 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
     public bool IsPlaying { get; private set; }
     public bool IsPaused { get; private set; }
     public string? ErrorMessage { get; private set; }
+    public bool NeedsMusicFolder { get; private set; }
 
 
     public async Task OpenPlaylistAsync(CancellationToken cancellationToken = default)
@@ -78,16 +79,28 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
             var path = CoverPlayerMP.Platforms.Android.PlaylistDocumentPicker.GetPhysicalPath(Platform.AppContext, uri);
             if (string.IsNullOrEmpty(path) || !File.Exists(path))
             {
-                SetError(text.ErrorPlaylistLocation(uri.ToString()));
-                return;
+                var name = CoverPlayerMP.Platforms.Android.PlaylistDocumentPicker.GetDisplayName(Platform.AppContext, uri);
+                await using var input = Platform.AppContext.ContentResolver?.OpenInputStream(uri)
+                    ?? throw new IOException(text.ErrorPlaylistLocation(uri.ToString() ?? string.Empty));
+                using var reader = new StreamReader(input, PlaylistParser.GetEncoding(name), false);
+                await LoadPlaylistAsync(await reader.ReadToEndAsync(cancellationToken), true, cancellationToken);
+                // Bei Content-URIs lassen sich relative Pfade nicht aus der Dokument-ID ableiten.
+                // Ein früher freigegebener Ordner wird still verwendet. Bleiben Titel unaufgelöst,
+                // erscheint ein Hinweis, über den der Anwender den Musikordner wählt.
+                var knownTree = CoverPlayerMP.Platforms.Android.PlaylistDocumentPicker.FindPersistedTree(Platform.AppContext, uri.Authority);
+                if (knownTree is not null)
+                    await ResolveWithFolderAsync(knownTree);
+                UpdateMusicFolderHint();
             }
-
-            await LoadPlaylistAsync(path, false, cancellationToken);
+            else
+                await LoadPlaylistAsync(path, false, cancellationToken);
             playlistUri = uri;
-            if (tracks.Count > 0)
-                await PlayAsync(0, cancellationToken);
+            var firstPlayable = tracks.FindIndex(t => !IsUnresolved(t));
+            if (firstPlayable >= 0)
+                await PlayAsync(firstPlayable, cancellationToken);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException
+                                       or Java.Lang.SecurityException)
         {
             SetError(text.ErrorOpenPlaylist(ex.Message));
         }
@@ -128,12 +141,51 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
 #endif
     }
 
+    public async Task SelectMusicFolderAsync(CancellationToken cancellationToken = default)
+    {
+#if ANDROID
+        try
+        {
+            var tree = await CoverPlayerMP.Platforms.Android.PlaylistDocumentPicker.PickTreeAsync(playlistUri);
+            if (tree is null)
+                return;
+
+            await ResolveWithFolderAsync(tree);
+            UpdateMusicFolderHint();
+            var firstPlayable = tracks.FindIndex(t => !IsUnresolved(t));
+            if (currentIndex < 0 && firstPlayable >= 0)
+                await PlayAsync(firstPlayable, cancellationToken);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException
+                                       or Java.Lang.SecurityException)
+        {
+            SetError(text.ErrorOpenPlaylist(ex.Message));
+        }
+#else
+        await Task.CompletedTask;
+#endif
+    }
+
     public async Task LoadPlaylistAsync(string pathOrContent, bool isContent = false, CancellationToken cancellationToken = default)
     {
         try
         {
-            var content = isContent ? pathOrContent : await File.ReadAllTextAsync(pathOrContent, PlaylistParser.GetEncoding(pathOrContent), cancellationToken);
-            var baseDirectory = isContent ? null : Path.GetDirectoryName(pathOrContent);
+            var isUrl = !isContent && PlaylistParser.IsHttpUrl(pathOrContent);
+            string content;
+            string? baseDirectory;
+            if (isUrl)
+            {
+                using var http = CreateHttpClientFor(new Uri(pathOrContent));
+                var bytes = await http.GetByteArrayAsync(pathOrContent, cancellationToken);
+                content = PlaylistParser.GetEncoding(new Uri(pathOrContent).AbsolutePath).GetString(bytes);
+                baseDirectory = pathOrContent[..(pathOrContent.IndexOfAny(['?', '#']) is var q and >= 0 ? q : pathOrContent.Length)];
+                baseDirectory = baseDirectory[..baseDirectory.LastIndexOf('/')];
+            }
+            else
+            {
+                content = isContent ? pathOrContent : await File.ReadAllTextAsync(pathOrContent, PlaylistParser.GetEncoding(pathOrContent), cancellationToken);
+                baseDirectory = isContent ? null : Path.GetDirectoryName(pathOrContent);
+            }
             tracks = PlaylistParser.Parse(content, baseDirectory).ToList();
             playlistPath = isContent ? null : pathOrContent;
 #if ANDROID
@@ -142,10 +194,13 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
             IsPlaylistModified = false;
             currentIndex = -1;
             failedTransitionIndex = null;
+            if (!isUrl)
+                serverBase = null;
+            NeedsMusicFolder = false;
             ErrorMessage = tracks.Count == 0 ? text.ErrorEmptyPlaylist : null;
             RaiseStateChanged();
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or HttpRequestException)
         {
             tracks = [];
             currentIndex = -1;
@@ -509,10 +564,159 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
             TaskScheduler.Default);
     }
 
+    private static bool SourceExists(string source) =>
+        PlaylistParser.IsHttpUrl(source) || source.StartsWith("content://", StringComparison.OrdinalIgnoreCase) || File.Exists(source);
+
+#if ANDROID
+    private static bool IsUnresolved(Track track) =>
+        !Path.IsPathRooted(track.Source) && !track.Source.Contains("://", StringComparison.Ordinal);
+
+    private async Task ResolveWithFolderAsync(global::Android.Net.Uri tree)
+    {
+        var snapshot = tracks.ToList();
+        tracks = await Task.Run(() => ResolveTracksInFolder(tree, snapshot));
+    }
+
+    private void UpdateMusicFolderHint()
+    {
+        var unresolved = tracks.Count(IsUnresolved);
+        NeedsMusicFolder = unresolved > 0;
+        if (NeedsMusicFolder)
+            ErrorMessage = text.MissingTracksHint(unresolved);
+        else if (tracks.Count > 0)
+            ErrorMessage = null;
+        RaiseStateChanged();
+    }
+
+    private static List<(string Id, string Name)> QueryChildren(
+        global::Android.Net.Uri tree, string parentId, Dictionary<string, List<(string Id, string Name)>> cache)
+    {
+        if (cache.TryGetValue(parentId, out var cached))
+            return cached;
+
+        var result = new List<(string Id, string Name)>();
+        try
+        {
+            var childrenUri = global::Android.Provider.DocumentsContract.BuildChildDocumentsUriUsingTree(tree, parentId);
+            using var cursor = childrenUri is null ? null : Platform.AppContext.ContentResolver?.Query(
+                childrenUri,
+                [global::Android.Provider.DocumentsContract.Document.ColumnDocumentId,
+                 global::Android.Provider.DocumentsContract.Document.ColumnDisplayName],
+                null, null, null);
+            if (cursor is not null)
+            {
+                while (cursor.MoveToNext())
+                {
+                    var childId = cursor.GetString(0);
+                    var name = cursor.GetString(1);
+                    if (childId is not null && name is not null)
+                        result.Add((childId, name));
+                }
+            }
+        }
+        catch (Java.Lang.Exception)
+        {
+        }
+
+        cache[parentId] = result;
+        return result;
+    }
+
+    // Sucht die Audiodateien der Playlist im gewählten Ordner. Die relativen Pfade werden ab dem
+    // gewählten Ordner aufgelöst; führende ".." und "." werden ignoriert. Liegt der gewählte Ordner
+    // tiefer als erwartet, werden führende Pfadsegmente schrittweise weggelassen.
+    private static List<Track> ResolveTracksInFolder(global::Android.Net.Uri tree, IReadOnlyList<Track> source)
+    {
+        var rootId = global::Android.Provider.DocumentsContract.GetTreeDocumentId(tree);
+        if (rootId is null)
+            return source.ToList();
+
+        var cache = new Dictionary<string, List<(string Id, string Name)>>();
+        return source.Select(track =>
+        {
+            if (!IsUnresolved(track))
+                return track;
+
+            var segments = track.Source.Split('/', '\\')
+                .Where(s => s is not ("" or "." or ".."))
+                .ToList();
+            for (var skip = 0; skip < segments.Count; skip++)
+            {
+                var id = FindDocumentId(tree, rootId, segments.Skip(skip), cache);
+                if (id is null)
+                    continue;
+
+                var uri = global::Android.Provider.DocumentsContract.BuildDocumentUriUsingTree(tree, id)?.ToString();
+                if (uri is not null)
+                    return track with { Source = uri, CoverSource = uri };
+            }
+
+            return track;
+        }).ToList();
+    }
+
+    private static string? FindDocumentId(
+        global::Android.Net.Uri tree, string startId, IEnumerable<string> segments,
+        Dictionary<string, List<(string Id, string Name)>> cache)
+    {
+        var current = startId;
+        foreach (var segment in segments)
+        {
+            var children = QueryChildren(tree, current, cache);
+            var match = children.FirstOrDefault(x => string.Equals(x.Name, segment, StringComparison.Ordinal));
+            if (match.Id is null)
+                match = children.FirstOrDefault(x => string.Equals(x.Name, segment, StringComparison.OrdinalIgnoreCase));
+            if (match.Id is null)
+                return null;
+
+            current = match.Id;
+        }
+
+        return current;
+    }
+
+    private string ResolveAndroidSource(string source)
+    {
+        if (PlaylistParser.IsHttpUrl(source))
+            return ApplyCoverAndReturn(source, DownloadToCache(source));
+        return ResolveContentSource(source);
+    }
+
+    private static string ResolveContentSource(string source)
+    {
+        if (!source.StartsWith("content://", StringComparison.OrdinalIgnoreCase))
+            return source;
+
+        var uri = global::Android.Net.Uri.Parse(source)!;
+        var extension = Path.GetExtension(CoverPlayerMP.Platforms.Android.PlaylistDocumentPicker.GetDisplayName(Platform.AppContext, uri) ?? string.Empty);
+        var cacheFile = Path.Combine(FileSystem.CacheDirectory, "doc_" + Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(System.Text.Encoding.UTF8.GetBytes(source))) + extension);
+        if (File.Exists(cacheFile))
+            return cacheFile;
+
+        using var input = OpenContent(uri, source);
+        using var output = File.Create(cacheFile);
+        input.CopyTo(output);
+        return cacheFile;
+    }
+
+    private static Stream OpenContent(global::Android.Net.Uri uri, string source)
+    {
+        try
+        {
+            return Platform.AppContext.ContentResolver?.OpenInputStream(uri)
+                ?? throw new FileNotFoundException(source, source);
+        }
+        catch (Java.Lang.SecurityException ex)
+        {
+            throw new UnauthorizedAccessException(ex.Message, ex);
+        }
+    }
+#endif
+
     private async Task LoadTrackAsync(int index, CancellationToken cancellationToken)
     {
         var source = tracks[index].Source;
-        if (!File.Exists(source))
+        if (!SourceExists(source))
             throw new FileNotFoundException(text.ErrorFileNotFound(source), source);
 
         var next = await CreatePlayerAsync(source, cancellationToken);
@@ -538,15 +742,27 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
             {
                 var index = tracks.FindIndex(x => string.Equals(x.Source, source, StringComparison.OrdinalIgnoreCase));
                 var track = index >= 0 ? tracks[index] : new Track(source, Path.GetFileNameWithoutExtension(source), string.Empty);
+                track = PrepareTrackForRenderer(track);
                 return (IAudioPlayer)new CoverPlayerMP.Player.Remote.RemoteAudioPlayer(renderer, fileServer, track, volume);
             }
 
 #if ANDROID
-            var androidPlayer = new CoverPlayerMP.Platforms.Android.AndroidFilePlayer(source);
+            var androidPlayer = new CoverPlayerMP.Platforms.Android.AndroidFilePlayer(ResolveAndroidSource(source));
             androidPlayer.SetPreferredDevice(preferredDevice);
             return (IAudioPlayer)androidPlayer;
 #else
-            var stream = File.OpenRead(source);
+            Stream stream;
+            if (PlaylistParser.IsHttpUrl(source))
+            {
+                var cacheFile = Path.Combine(FileSystem.CacheDirectory, "net_" + Guid.NewGuid().ToString("N") + Path.GetExtension(new Uri(source).AbsolutePath));
+                using (var http = CreateHttpClientFor(new Uri(source)))
+                using (var remote = http.GetStreamAsync(source, cancellationToken).GetAwaiter().GetResult())
+                using (var target = File.Create(cacheFile))
+                    remote.CopyTo(target);
+                stream = new FileStream(cacheFile, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.DeleteOnClose);
+            }
+            else
+                stream = File.OpenRead(source);
             var player = audioManager.CreatePlayer(stream);
             playerStreams.Add(player, stream);
             return player;
@@ -693,7 +909,7 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
         }
 
         var nextSource = tracks[nextIndex].Source;
-        if (!File.Exists(nextSource))
+        if (!SourceExists(nextSource))
             throw new FileNotFoundException(text.ErrorFileNotFound(nextSource), nextSource);
 
         var next = await CreatePlayerAsync(nextSource, token);
@@ -866,7 +1082,7 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
             }
             finally
             {
-                if (!isDisposed && File.Exists(source))
+                if (!isDisposed && SourceExists(source))
                 {
                     var next = await CreatePlayerAsync(source, CancellationToken.None);
                     next.Volume = wasPaused ? 0 : volume; // ohne Einblendung
