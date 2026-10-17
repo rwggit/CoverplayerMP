@@ -194,8 +194,44 @@ public sealed class AppText
         public string ServerEmpty => T("Keine Ordner oder Playlists gefunden.", "No folders or playlists found.", "Aucun dossier ni playlist trouvé.");
         public string ServerLoading => T("Wird geladen …", "Loading …", "Chargement …");
         public string ServerChoosePlaylist => T("Playlist auswählen", "Choose a playlist", "Choisir une playlist");
-    public string ErrorInvalidServerUrl => T("Bitte eine gültige http- oder https-Adresse angeben.", "Please enter a valid http or https address.", "Veuillez saisir une adresse http ou https valide.");
-    public string ErrorServerFile(string url, int status) => T($"Der Server liefert {url} nicht (Status {status}).", $"The server does not deliver {url} (status {status}).", $"Le serveur ne fournit pas {url} (statut {status}).");
+    public string ServerAddressExampleHint => T(
+        "Gültige Serveradressen sind z.B. für ein Synology NAS DS720+ DS720plus:5006 oder 192.168.1.2:5006",
+        "e.g. DS720plus:5006 or 192.168.1.2:5006 (Synology NAS DS720+)",
+        "p. ex. DS720plus:5006 ou 192.168.1.2:5006 (NAS Synology DS720+)");
+    public string ServerTrustCertificateHint => T(
+        "Es könnte helfen, den Haken bei „Zertifikat dieses Servers akzeptieren (selbstsigniert)“ zu setzen",
+        "Enabling \"Accept this server's certificate (self-signed)\" might help",
+        "Cocher « Accepter le certificat de ce serveur (auto-signé) » pourrait aider");
+    public string ErrorInvalidServerUrl => T(
+        $"Bitte eine gültige http- oder https-Adresse angeben, {ServerAddressExampleHint}.",
+        $"Please enter a valid http or https address, {ServerAddressExampleHint}.",
+        $"Veuillez saisir une adresse http ou https valide, {ServerAddressExampleHint}.");
+    public string ErrorServerFile(string url, int status)
+    {
+        var message = T($"Der Server liefert {url} nicht (Status {status} – {DescribeHttpStatus(status)}).",
+            $"The server does not deliver {url} (status {status} – {DescribeHttpStatus(status)}).",
+            $"Le serveur ne fournit pas {url} (statut {status} – {DescribeHttpStatus(status)}).");
+
+        // Bei 405 unterstützt der Server vermutlich kein WebDAV an dieser Adresse – ein gültiges Beispiel hilft weiter.
+        return status == 405 ? $"{message} {ServerAddressExampleHint}." : message;
+    }
+
+    // Erklärt den HTTP-Statuscode in Klartext, damit z. B. "401" nicht ohne Kontext erscheint.
+    private string DescribeHttpStatus(int status) => status switch
+    {
+        401 => T("nicht autorisiert, Benutzername oder Passwort falsch", "unauthorized, wrong username or password", "non autorisé, nom d'utilisateur ou mot de passe incorrect"),
+        403 => T("Zugriff verweigert", "access forbidden", "accès refusé"),
+        404 => T("nicht gefunden", "not found", "introuvable"),
+        405 => T("Methode nicht erlaubt, Server unterstützt vermutlich kein WebDAV", "method not allowed, the server likely does not support WebDAV", "méthode non autorisée, le serveur ne prend probablement pas en charge WebDAV"),
+        407 => T("Proxy-Authentifizierung erforderlich", "proxy authentication required", "authentification du proxy requise"),
+        408 => T("Zeitüberschreitung bei der Anfrage", "request timed out", "délai d'attente de la requête dépassé"),
+        409 => T("Konflikt beim Zugriff auf die Ressource", "conflict accessing the resource", "conflit lors de l'accès à la ressource"),
+        410 => T("nicht mehr verfügbar", "no longer available", "n'est plus disponible"),
+        423 => T("Ressource ist gesperrt", "resource is locked", "ressource verrouillée"),
+        429 => T("zu viele Anfragen, bitte später erneut versuchen", "too many requests, please try again later", "trop de requêtes, veuillez réessayer plus tard"),
+        >= 500 and < 600 => T("Serverfehler", "server error", "erreur du serveur"),
+        _ => T("unerwarteter Fehler", "unexpected error", "erreur inattendue")
+    };
     public string MusicSourceNeeded(int count) => T($"Für {count} Titel der Playlist fehlen die Audiodateien. Wähle den Musikordner, einzelne Audiodateien oder einen Server.", $"The audio files for {count} playlist tracks are missing. Select the music folder, individual audio files or a server.", $"Les fichiers audio de {count} morceaux de la playlist manquent. Choisissez le dossier de musique, des fichiers audio ou un serveur.");
     public string SelectMusicFolder => T("Musikordner wählen", "Select music folder", "Choisir le dossier de musique");
     public string MusicFolderNeeded(int count) => T(

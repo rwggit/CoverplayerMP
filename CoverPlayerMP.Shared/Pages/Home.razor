@@ -58,7 +58,7 @@
                     <label class="setting-hint"><input type="checkbox" @bind="serverTrustCertificate" /> @Text.ServerTrustCertificate</label>
                     @if (serverError is not null)
                     {
-                        <small class="setting-hint" role="alert">@serverError</small>
+                        <strong class="server-error" role="alert">@serverError</strong>
                     }
                     <button class="play-button" disabled="@serverBusy" @onclick="ConnectServerAsync">@(serverBusy ? Text.ServerLoading : Text.Connect)</button>
                 }
@@ -67,7 +67,7 @@
                     <span class="server-path">@serverFolder</span>
                     @if (serverError is not null)
                     {
-                        <small class="setting-hint" role="alert">@serverError</small>
+                        <strong class="server-error" role="alert">@serverError</strong>
                     }
                     <div class="server-list" aria-label="@Text.ServerChoosePlaylist">
                         @if (ServerParentUrl is { } parentUrl)
@@ -696,6 +696,12 @@
     {
         await SaveSettingAsync(ServerUrlKey, serverUrl.Trim());
         await SaveSettingAsync(ServerUserKey, serverUser.Trim());
+
+        // Always reset browsing state before a new connection attempt so the dialog
+        // visibly returns to loading/input mode and errors are shown in the same flow.
+        serverEntries = null;
+        serverFolder = string.Empty;
+
         await BrowseServerAsync(NormalizeServerUrl(serverUrl));
     }
 
@@ -726,12 +732,24 @@
         }
     }
 
-    private static string DescribeException(Exception ex)
+    private string DescribeException(Exception ex)
     {
         var messages = new List<string>();
         for (var current = ex; current is not null; current = current.InnerException)
             if (!messages.Contains(current.Message))
                 messages.Add(current.Message);
+
+        // Bei unbekanntem Host (z. B. Tippfehler in der Adresse) direkt ein gültiges Beispiel mitgeben.
+        var isHostNotFound = ex.InnerException is System.Net.Sockets.SocketException
+            { SocketErrorCode: System.Net.Sockets.SocketError.HostNotFound };
+        if (isHostNotFound)
+            messages.Add(Text.ServerAddressExampleHint);
+
+        // Bei SSL-Fehlern auf die Option für selbstsignierte Zertifikate hinweisen, falls sie noch nicht aktiv ist.
+        var isSslError = messages.Any(m => m.Contains("SSL connection could not be established", StringComparison.OrdinalIgnoreCase));
+        if (isSslError && !serverTrustCertificate)
+            messages.Add(Text.ServerTrustCertificateHint);
+
         return string.Join(" → ", messages);
     }
 
@@ -775,11 +793,19 @@
 
     private void ShowTrackInfo() => ShowTrackInfo(Player.CurrentTrack);
 
+    // Bei Server-/content://-Titeln liegt in CoverSource die heruntergeladene lokale Datei, sobald das
+    // Abspielen begonnen hat; nur daraus lassen sich ID3-Tags auslesen (die Quelle selbst bleibt eine URL).
     private void ShowTrackInfo(Track? track)
     {
-        infoSource = track?.Source;
+        infoSource = LocalMetadataSource(track);
         trackInfo = TrackMetadata.Read(infoSource, Text);
     }
+
+    private static string? LocalMetadataSource(Track? track) =>
+        track is null ? null
+        : File.Exists(track.Source) ? track.Source
+        : track.CoverSource is { } local && File.Exists(local) ? local
+        : track.Source;
 
     private void CloseTrackInfo() => trackInfo = null;
 
@@ -826,7 +852,7 @@
         if (Player.CurrentTrack is not { } track || coverSearching)
             return;
 
-        infoSource = track.Source;
+        infoSource = LocalMetadataSource(track);
         pictures ??= [];
         newCoverBytes = null;
         newCover = null;
@@ -862,12 +888,21 @@
         if (newCoverBytes is null || Player.CurrentTrack is not { } track)
             return;
 
+        // Bei Server-Titeln kann nur die lokal zwischengespeicherte Kopie geändert werden,
+        // nicht die Originaldatei auf dem WebDAV-Server.
+        var localFile = LocalMetadataSource(track);
+        if (localFile is null || !File.Exists(localFile))
+        {
+            newCover = null;
+            return;
+        }
+
         var bytes = newCoverBytes;
         try
         {
             Task Write()
             {
-                CoverSearch.Apply(track.Source, bytes);
+                CoverSearch.Apply(localFile, bytes);
                 return Task.CompletedTask;
             }
 
@@ -877,7 +912,7 @@
             else
                 await Write();
 
-            coverUri = CoverImage.ToDataUri(track.CoverSource ?? track.Source);
+            coverUri = CoverImage.ToDataUri(localFile);
             coverChanged = true;
             newCoverBytes = null;
             newCover = null;

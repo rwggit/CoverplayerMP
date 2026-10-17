@@ -276,6 +276,16 @@
 
 .setting-row { flex-wrap: wrap; }
 .setting-hint { flex: 0 0 100%; opacity: .7; }
+.server-error {
+    flex: 0 0 100%;
+    display: block;
+    padding: .5rem .75rem;
+    border: 1px solid #a33d49;
+    border-radius: .5rem;
+    background: rgb(90 24 35 / 95%);
+    color: #fff;
+    font-weight: 600;
+}
 .control-toolbar {
     display: flex;
     flex-wrap: wrap;

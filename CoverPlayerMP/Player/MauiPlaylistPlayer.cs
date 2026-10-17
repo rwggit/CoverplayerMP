@@ -754,12 +754,11 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
             Stream stream;
             if (PlaylistParser.IsHttpUrl(source))
             {
-                var cacheFile = Path.Combine(FileSystem.CacheDirectory, "net_" + Guid.NewGuid().ToString("N") + Path.GetExtension(new Uri(source).AbsolutePath));
-                using (var http = CreateHttpClientFor(new Uri(source)))
-                using (var remote = http.GetStreamAsync(source, cancellationToken).GetAwaiter().GetResult())
-                using (var target = File.Create(cacheFile))
-                    remote.CopyTo(target);
-                stream = new FileStream(cacheFile, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.DeleteOnClose);
+                // Im persistenten Cache ablegen (statt einer flüchtigen DeleteOnClose-Datei), damit ID3-Tags
+                // und Cover auch nach dem Abspielen aus der lokalen Datei gelesen werden können.
+                var cacheFile = DownloadToCache(source);
+                ApplyDownloadedCover(source, cacheFile);
+                stream = File.OpenRead(cacheFile);
             }
             else
                 stream = File.OpenRead(source);
