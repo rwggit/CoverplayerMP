@@ -276,7 +276,7 @@
 
     @if (editorVisible && !libraryVisible)
     {
-        <section class="library-dialog" style="--editor-cover-size: @(editorCoverSize)rem;" @onclick:stopPropagation="true">
+        <section class="library-dialog @(playlistLayout switch { PlaylistLayout.Left => "library-dialog-narrow library-dialog-left", PlaylistLayout.Right => "library-dialog-narrow library-dialog-right", _ => null })" style="--editor-cover-size: @(editorCoverSize)rem;" @onclick:stopPropagation="true">
             <div class="control-dialog-header">
                 <span>@Text.EditPlaylist (@FilteredPlaylist.Count() @Text.Of @Player.Tracks.Count)</span>
                 <button class="close-button" title="@Text.Close" @onclick="CloseEditor">×</button>
@@ -295,6 +295,36 @@
                 <button @onclick="OpenLibraryAsync" title="@Text.AddTrack" aria-label="@Text.AddTrack">+</button>
                 <button @onclick="ShowSelectedTrackInfo" disabled="@(SelectedTrack is null)"
                         title="@Text.TrackDetails" aria-label="@Text.TrackDetails">i</button>
+                <div class="layout-buttons editor-toolbar-layout-buttons">
+                    <button type="button" class="layout-button @(playlistLayout == PlaylistLayout.Table ? "active" : null)"
+                            title="@Text.PlaylistLayoutTable" aria-label="@Text.PlaylistLayoutTable"
+                            @onclick="() => SetPlaylistLayoutAsync(PlaylistLayout.Table)">
+                        <svg viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
+                            <rect x="3" y="4" width="18" height="16" rx="1.5" />
+                            <line x1="3" y1="9" x2="21" y2="9" />
+                            <line x1="3" y1="14" x2="21" y2="14" />
+                            <line x1="3" y1="19" x2="21" y2="19" />
+                        </svg>
+                    </button>
+                    <button type="button" class="layout-button @(playlistLayout == PlaylistLayout.Left ? "active" : null)"
+                            title="@Text.PlaylistLayoutLeft" aria-label="@Text.PlaylistLayoutLeft"
+                            @onclick="() => SetPlaylistLayoutAsync(PlaylistLayout.Left)">
+                        <svg viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
+                            <rect x="3" y="4" width="7" height="16" rx="1.2" />
+                            <line x1="13" y1="8" x2="21" y2="8" />
+                            <line x1="13" y1="16" x2="18" y2="16" />
+                        </svg>
+                    </button>
+                    <button type="button" class="layout-button @(playlistLayout == PlaylistLayout.Right ? "active" : null)"
+                            title="@Text.PlaylistLayoutRight" aria-label="@Text.PlaylistLayoutRight"
+                            @onclick="() => SetPlaylistLayoutAsync(PlaylistLayout.Right)">
+                        <svg viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
+                            <rect x="14" y="4" width="7" height="16" rx="1.2" />
+                            <line x1="3" y1="8" x2="11" y2="8" />
+                            <line x1="6" y1="16" x2="11" y2="16" />
+                        </svg>
+                    </button>
+                </div>
             </div>
             @if (selectionMode)
             {
@@ -304,71 +334,149 @@
                     <button @onclick="EndSelectionMode" title="@Text.EndSelection" aria-label="@Text.EndSelection">×</button>
                 </div>
             }
-            <div class="library-table-wrapper">
-                <table class="library-table editor-table">
-                    <thead>
-                        <tr>
-                            <th class="editor-grip-cell"></th>
-                            @if (selectionMode)
+            @if (playlistLayout == PlaylistLayout.Table)
+            {
+                <div class="library-table-wrapper">
+                    <table class="library-table editor-table">
+                        <thead>
+                            <tr>
+                                <th class="editor-grip-cell"></th>
+                                @if (selectionMode)
+                                {
+                                    <th class="editor-check-cell"></th>
+                                }
+                                <th class="sortable" @onclick="() => EditorSortBy(EditorSortColumn.Position)">@Text.No@(EditorSortIndicator(EditorSortColumn.Position))</th>
+                                <th class="sortable" @onclick="() => EditorSortBy(EditorSortColumn.Artist)">@Text.Artist@(EditorSortIndicator(EditorSortColumn.Artist))</th>
+                                <th class="sortable" @onclick="() => EditorSortBy(EditorSortColumn.Title)">@Text.Title@(EditorSortIndicator(EditorSortColumn.Title))</th>
+                                <th>@Text.Cover</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var (track, index) in FilteredPlaylist)
                             {
-                                <th class="editor-check-cell"></th>
+                                var details = GetEditorDetails(track);
+                                <tr @key="track" class="@EditorRowClass(index)" @onclick="e => SelectRow(index, e)"
+                                    @onpointerdown="e => BeginLongPress(index, e)"
+                                    @onpointermove="MoveLongPress"
+                                    @onpointerup="CancelLongPress"
+                                    @onpointercancel="CancelLongPress"
+                                    @onpointerleave="CancelLongPress"
+                                    @oncontextmenu:preventDefault="true"
+                                    @ondragenter="() => dropIndex = index"
+                                    @ondragover:preventDefault="true"
+                                    @ondrop="() => DropTrack(index)">
+                                    <td class="editor-grip-cell">
+                                        <span class="editor-grip" draggable="@(editingIndex is null ? "true" : "false")"
+                                               title="@Text.Move" aria-label="@Text.Move"
+                                              @onpointerdown:stopPropagation="true"
+                                              @onclick:stopPropagation="true"
+                                              @ondragstart="() => BeginDrag(index)"
+                                              @ondragend="EndDrag">≡</span>
+                                    </td>
+                                    @if (selectionMode)
+                                    {
+                                        <td class="editor-check-cell">
+                                            <input type="checkbox" checked="@selectedIndices.Contains(index)" tabindex="-1"
+                                                   aria-label="@Text.Select" style="pointer-events: none;" />
+                                        </td>
+                                    }
+                                    <td class="editor-position" @onclick="() => { if (!selectionMode) BeginEditPosition(index); }">
+                                        @if (editingIndex == index)
+                                        {
+                                            <input type="number" min="1" max="@Player.Tracks.Count"
+                                                   @bind="editingValue" @bind:event="oninput"
+                                                   @onkeydown="OnPositionKeyDown" @onblur="CommitPosition"
+                                                   @onclick:stopPropagation="true" autofocus />
+                                        }
+                                        else
+                                        {
+                                            @(index + 1)
+                                        }
+                                    </td>
+                                    <td>@track.Artist</td>
+                                    <td>@track.Title</td>
+                                    <td class="editor-cover-cell">
+                                        <button class="editor-cover" title="@Text.PlayTrack" aria-label="@Text.PlayTrack"
+                                                @onclick="() => PlayFromEditorAsync(index)">
+                                            @if (details.Cover is not null)
+                                            {
+                                                <img src="@details.Cover" alt="" />
+                                            }
+                                            else
+                                            {
+                                                <span class="editor-cover-placeholder">♪</span>
+                                            }
+                                            <span class="editor-cover-play">
+                                                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+                                                    <path d="M6 4.5v15a.8.8 0 0 0 1.2.7l12-7.5a.8.8 0 0 0 0-1.4l-12-7.5A.8.8 0 0 0 6 4.5z" />
+                                                </svg>
+                                            </span>
+                                            @if (details.Duration is { } duration)
+                                            {
+                                                <span class="editor-cover-duration">@FormatTime(duration.TotalSeconds)</span>
+                                            }
+                                        </button>
+                                    </td>
+                                </tr>
                             }
-                            <th class="sortable" @onclick="() => EditorSortBy(EditorSortColumn.Position)">@Text.No@(EditorSortIndicator(EditorSortColumn.Position))</th>
-                            <th class="sortable" @onclick="() => EditorSortBy(EditorSortColumn.Artist)">@Text.Artist@(EditorSortIndicator(EditorSortColumn.Artist))</th>
-                            <th class="sortable" @onclick="() => EditorSortBy(EditorSortColumn.Title)">@Text.Title@(EditorSortIndicator(EditorSortColumn.Title))</th>
-                            <th>@Text.Cover</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="library-table-wrapper playlist-list-wrapper">
+                    <div class="playlist-list @(playlistLayout == PlaylistLayout.Right ? "align-right" : "align-left")">
                         @foreach (var (track, index) in FilteredPlaylist)
                         {
                             var details = GetEditorDetails(track);
-                            <tr @key="track" class="@EditorRowClass(index)" @onclick="e => SelectRow(index, e)"
-                                @onpointerdown="e => BeginLongPress(index, e)"
-                                @onpointermove="MoveLongPress"
-                                @onpointerup="CancelLongPress"
-                                @onpointercancel="CancelLongPress"
-                                @onpointerleave="CancelLongPress"
-                                @oncontextmenu:preventDefault="true"
-                                @ondragenter="() => dropIndex = index"
-                                @ondragover:preventDefault="true"
-                                @ondrop="() => DropTrack(index)">
-                                <td class="editor-grip-cell">
+                            <div @key="track" class="playlist-card @EditorRowClass(index)" @onclick="e => SelectRow(index, e)"
+                                 @onpointerdown="e => BeginLongPress(index, e)"
+                                 @onpointermove="MoveLongPress"
+                                 @onpointerup="CancelLongPress"
+                                 @onpointercancel="CancelLongPress"
+                                 @onpointerleave="CancelLongPress"
+                                 @oncontextmenu:preventDefault="true"
+                                 @ondragenter="() => dropIndex = index"
+                                 @ondragover:preventDefault="true"
+                                 @ondrop="() => DropTrack(index)">
+                                <div class="playlist-card-head">
+                                    @if (selectionMode)
+                                    {
+                                        <input type="checkbox" checked="@selectedIndices.Contains(index)" tabindex="-1"
+                                               aria-label="@Text.Select" style="pointer-events: none;" />
+                                    }
                                     <span class="editor-grip" draggable="@(editingIndex is null ? "true" : "false")"
                                            title="@Text.Move" aria-label="@Text.Move"
                                           @onpointerdown:stopPropagation="true"
                                           @onclick:stopPropagation="true"
                                           @ondragstart="() => BeginDrag(index)"
                                           @ondragend="EndDrag">≡</span>
-                                </td>
-                                @if (selectionMode)
-                                {
-                                    <td class="editor-check-cell">
-                                        <input type="checkbox" checked="@selectedIndices.Contains(index)" tabindex="-1"
-                                               aria-label="@Text.Select" style="pointer-events: none;" />
-                                    </td>
-                                }
-                                <td class="editor-position" @onclick="() => { if (!selectionMode) BeginEditPosition(index); }">
-                                    @if (editingIndex == index)
-                                    {
-                                        <input type="number" min="1" max="@Player.Tracks.Count"
-                                               @bind="editingValue" @bind:event="oninput"
-                                               @onkeydown="OnPositionKeyDown" @onblur="CommitPosition"
-                                               @onclick:stopPropagation="true" autofocus />
-                                    }
-                                    else
-                                    {
-                                        @(index + 1)
-                                    }
-                                </td>
-                                <td>@track.Artist</td>
-                                <td>@track.Title</td>
-                                <td class="editor-cover-cell">
-                                    <button class="editor-cover" title="@Text.PlayTrack" aria-label="@Text.PlayTrack"
-                                            @onclick="() => PlayFromEditorAsync(index)">
+                                </div>
+                                <div class="playlist-card-cover-wrap">
+                                    <span class="playlist-card-position" @onclick="() => { if (!selectionMode) BeginEditPosition(index); }"
+                                          @onclick:stopPropagation="true">
+                                        @if (editingIndex == index)
+                                        {
+                                            <input type="number" min="1" max="@Player.Tracks.Count"
+                                                   @bind="editingValue" @bind:event="oninput"
+                                                   @onkeydown="OnPositionKeyDown" @onblur="CommitPosition"
+                                                   @onclick:stopPropagation="true" autofocus />
+                                        }
+                                        else
+                                        {
+                                            @(index + 1)
+                                        }
+                                    </span>
+                                    <button class="editor-cover playlist-card-cover" title="@Text.PlayTrack" aria-label="@Text.PlayTrack"
+                                            draggable="@(editingIndex is null ? "true" : "false")"
+                                            @onclick="() => PlayFromEditorAsync(index)" @onclick:stopPropagation="true"
+                                            @onpointerdown:stopPropagation="true"
+                                            @ondragstart="() => BeginDrag(index)"
+                                            @ondragend="EndDrag">
                                         @if (details.Cover is not null)
                                         {
-                                            <img src="@details.Cover" alt="" />
+                                            <img src="@details.Cover" alt="" draggable="false" />
                                         }
                                         else
                                         {
@@ -384,12 +492,14 @@
                                             <span class="editor-cover-duration">@FormatTime(duration.TotalSeconds)</span>
                                         }
                                     </button>
-                                </td>
-                            </tr>
+                                </div>
+                                <div class="playlist-card-artist">@track.Artist</div>
+                                <div class="playlist-card-title">@track.Title</div>
+                            </div>
                         }
-                    </tbody>
-                </table>
-            </div>
+                    </div>
+                </div>
+            }
         </section>
     }
 
@@ -548,11 +658,44 @@
                     </label>
                     <label class="setting-row">
                         <span>@Text.CoverSize</span>
-                        <input type="range" min="3" max="12" step="1"
+                        <input type="range" min="3" max="24" step="1"
                                title="@Text.CoverSizeTooltip(editorCoverSize)"
                                value="@editorCoverSize"
                                @oninput="OnEditorCoverSizeChanged" />
                         <span class="setting-value">@editorCoverSize rem</span>
+                    </label>
+                    <label class="setting-row">
+                        <span>@Text.PlaylistLayoutLabel</span>
+                        <div class="layout-buttons">
+                            <button type="button" class="layout-button @(playlistLayout == PlaylistLayout.Table ? "active" : null)"
+                                    title="@Text.PlaylistLayoutTable" aria-label="@Text.PlaylistLayoutTable"
+                                    @onclick="() => SetPlaylistLayoutAsync(PlaylistLayout.Table)">
+                                <svg viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
+                                    <rect x="3" y="4" width="18" height="16" rx="1.5" />
+                                    <line x1="3" y1="9" x2="21" y2="9" />
+                                    <line x1="3" y1="14" x2="21" y2="14" />
+                                    <line x1="3" y1="19" x2="21" y2="19" />
+                                </svg>
+                            </button>
+                            <button type="button" class="layout-button @(playlistLayout == PlaylistLayout.Left ? "active" : null)"
+                                    title="@Text.PlaylistLayoutLeft" aria-label="@Text.PlaylistLayoutLeft"
+                                    @onclick="() => SetPlaylistLayoutAsync(PlaylistLayout.Left)">
+                                <svg viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
+                                    <rect x="3" y="4" width="7" height="16" rx="1.2" />
+                                    <line x1="13" y1="8" x2="21" y2="8" />
+                                    <line x1="13" y1="16" x2="18" y2="16" />
+                                </svg>
+                            </button>
+                            <button type="button" class="layout-button @(playlistLayout == PlaylistLayout.Right ? "active" : null)"
+                                    title="@Text.PlaylistLayoutRight" aria-label="@Text.PlaylistLayoutRight"
+                                    @onclick="() => SetPlaylistLayoutAsync(PlaylistLayout.Right)">
+                                <svg viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
+                                    <rect x="14" y="4" width="7" height="16" rx="1.2" />
+                                    <line x1="3" y1="8" x2="11" y2="8" />
+                                    <line x1="6" y1="16" x2="11" y2="16" />
+                                </svg>
+                            </button>
+                        </div>
                     </label>
                     <label class="setting-row">
                         <span>@Text.LanguageLabel</span>
@@ -771,6 +914,17 @@
         windowButtonsVisible = false;
     }
     private int editorCoverSize = 5;
+    private enum PlaylistLayout { Table, Left, Right }
+    private PlaylistLayout playlistLayout = PlaylistLayout.Table;
+
+    private async Task SetPlaylistLayoutAsync(PlaylistLayout layout)
+    {
+        if (playlistLayout == layout)
+            return;
+        playlistLayout = layout;
+        await SaveSettingAsync(PlaylistLayoutKey, layout.ToString());
+    }
+
     private string? coverUri;
     private string? coverSource;
     private ElementReference coverCanvas;
@@ -1138,6 +1292,7 @@
     private const string CoverFadeKey = "coverPlayer.coverFadeSeconds";
     private double coverFadeSeconds = 2;
     private const string EditorCoverSizeKey = "coverPlayer.editorCoverSize";
+    private const string PlaylistLayoutKey = "coverPlayer.playlistLayout";
     private const string LanguageKey = "coverPlayer.language";
     private const string ServerUrlKey = "coverPlayer.serverUrl";
     private const string ServerUserKey = "coverPlayer.serverUser";
@@ -1188,7 +1343,11 @@
 
             var coverSize = await Js.InvokeAsync<string?>("localStorage.getItem", EditorCoverSizeKey);
             if (int.TryParse(coverSize, out var size))
-                editorCoverSize = Math.Clamp(size, 3, 12);
+                editorCoverSize = Math.Clamp(size, 3, 24);
+
+            var layout = await Js.InvokeAsync<string?>("localStorage.getItem", PlaylistLayoutKey);
+            if (Enum.TryParse<PlaylistLayout>(layout, out var parsedLayout))
+                playlistLayout = parsedLayout;
 
             var language = await Js.InvokeAsync<string?>("localStorage.getItem", LanguageKey);
             if (Enum.TryParse<AppLanguage>(language, out var appLanguage))
@@ -1659,20 +1818,28 @@
 
     // Schlüssel enthält die CoverSource: Server-Titel haben zunächst eine URL (kein Cover). Sobald der Titel
     // heruntergeladen ist, zeigt CoverSource auf die lokale Datei, und das Cover wird neu geladen.
-    private static string EditorDetailsKey(Track track) => track.Source + "|" + (track.CoverSource ?? string.Empty);
+    // Die Pixelgröße ist Teil des Schlüssels, damit das Cover neu (und schärfer) geladen wird, sobald die
+    // Cover-Größe in den Optionen verändert wird.
+    private static string EditorDetailsKey(Track track, int pixelSize) =>
+        track.Source + "|" + (track.CoverSource ?? string.Empty) + "|" + pixelSize;
+
+    // Zielauflösung des Covers in Pixel: an die eingestellte Darstellungsgröße (in rem) gekoppelt und mit einem
+    // Faktor für hochauflösende (Retina/HiDPI) Displays versehen, damit das Cover nicht unscharf wirkt.
+    private int EditorCoverPixelSize => Math.Clamp(editorCoverSize * 16 * 3, 160, 1152);
 
     private EditorDetails GetEditorDetails(Track track)
     {
-        var key = EditorDetailsKey(track);
+        var pixelSize = EditorCoverPixelSize;
+        var key = EditorDetailsKey(track, pixelSize);
         if (editorDetails.TryGetValue(key, out var details))
             return details;
 
         if (editorDetailsLoading.Add(key))
-            _ = LoadEditorDetailsAsync(track, key);
+            _ = LoadEditorDetailsAsync(track, key, pixelSize);
         return EmptyDetails;
     }
 
-    private async Task LoadEditorDetailsAsync(Track track, string key)
+    private async Task LoadEditorDetailsAsync(Track track, string key, int pixelSize)
     {
         var details = await Task.Run(() =>
         {
@@ -1680,7 +1847,7 @@
             TimeSpan? duration = null;
             try
             {
-                cover = CoverImage.ToDataUri(track.CoverSource ?? track.Source, 160);
+                cover = CoverImage.ToDataUri(track.CoverSource ?? track.Source, pixelSize);
             }
             catch (Exception)
             {
@@ -1946,7 +2113,7 @@
     {
         if (int.TryParse(args.Value?.ToString(), out var value))
         {
-            editorCoverSize = Math.Clamp(value, 3, 12);
+            editorCoverSize = Math.Clamp(value, 3, 24);
             await SaveSettingAsync(EditorCoverSizeKey, editorCoverSize.ToString());
         }
     }

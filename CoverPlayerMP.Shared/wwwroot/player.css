@@ -276,6 +276,9 @@
 
 .setting-row { flex-wrap: wrap; }
 .setting-hint { flex: 0 0 100%; opacity: .7; }
+.layout-buttons { display: flex; gap: .4rem; }
+.layout-button { padding: .4rem .6rem; display: grid; place-items: center; }
+.layout-button.active { background: #5b4acb; border-color: #8a7cff; }
 .server-error {
     flex: 0 0 100%;
     display: block;
@@ -366,6 +369,24 @@ button:disabled { cursor: not-allowed; opacity: .45; }
     box-shadow: 0 1rem 3rem rgb(0 0 0 / 45%);
     user-select: text;
 }
+/* Linksbündige/rechtsbündige Playlistansicht: nur eine Spalte, daher Dialogbreite an die
+   Coverbreite koppeln statt den gesamten verfügbaren Platz zu belegen, und den Dialog an
+   den linken bzw. rechten Rand andocken statt ihn zu zentrieren. */
+.library-dialog-narrow {
+    width: max(calc(var(--editor-cover-size, 5rem) + 3.5rem), 11rem);
+    max-width: calc(100% - 2rem);
+    overflow-x: hidden;
+}
+.library-dialog-left { right: auto; }
+.library-dialog-right { left: auto; }
+/* Im schmalen Dialog reicht die Breite oft nicht für Suchfeld + Schaltflächen in einer Zeile;
+   daher umbrechen und das Suchfeld auf eine eigene Zeile stellen. */
+.library-dialog-narrow .editor-toolbar { flex-wrap: wrap; }
+.library-dialog-narrow .editor-toolbar .editor-search { flex: 1 1 100%; min-width: 0; }
+.library-dialog-narrow .editor-toolbar button { flex: 0 0 auto; }
+.library-dialog-narrow .editor-toolbar-layout-buttons { flex: 1 1 100%; justify-content: flex-end; }
+.library-dialog-narrow .selection-toolbar { flex-wrap: wrap; }
+.library-dialog-narrow .selection-toolbar span { flex: 1 1 100%; min-width: 0; }
 .library-status { padding: 1rem; color: #c9cde0; }
 .library-table-wrapper { flex: 1; min-height: 0; overflow: auto; }
 .library-table { width: 100%; border-collapse: collapse; }
@@ -450,6 +471,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .selection-toolbar span { flex: 1; }
 .editor-toolbar { display: flex; gap: .5rem; align-items: center; margin-bottom: .5rem; }
 .editor-toolbar .editor-search { flex: 1; margin-bottom: 0; }
+.editor-toolbar-layout-buttons { margin-left: auto; padding-left: .5rem; border-left: 1px solid #373c50; }
 .editor-table td.editor-position { width: 4rem; cursor: pointer; font-variant-numeric: tabular-nums; }
 .editor-table td.editor-position input {
     width: 3.5rem;
@@ -473,8 +495,8 @@ button:disabled { cursor: not-allowed; opacity: .45; }
     border-radius: .4rem;
     background: #10131b;
 }
-.editor-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.editor-cover-placeholder { display: grid; place-items: center; height: 100%; font-size: 2rem; color: #6b7290; }
+.editor-cover img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.editor-cover-placeholder { display: grid; place-items: center; height: 100%; font-size: 2rem; color: #6b7290; pointer-events: none; }
 .editor-cover-play {
     position: absolute;
     inset: 0;
@@ -483,6 +505,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
     color: rgb(255 255 255 / 75%);
     background: rgb(0 0 0 / 15%);
     transition: background .15s, color .15s;
+    pointer-events: none;
 }
 .editor-cover-play svg { width: 2rem; height: 2rem; filter: drop-shadow(0 0 3px rgb(0 0 0 / 80%)); }
 .editor-cover:hover .editor-cover-play { color: #fff; background: rgb(0 0 0 / 35%); }
@@ -495,8 +518,83 @@ button:disabled { cursor: not-allowed; opacity: .45; }
     background: rgb(0 0 0 / 70%);
     color: #fff;
     font-size: .7rem;
+    pointer-events: none;
     font-variant-numeric: tabular-nums;
 }
+
+.playlist-list-wrapper { display: flex; overflow-x: hidden; }
+.playlist-list {
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    width: 100%;
+    min-width: 0;
+    padding: .25rem 0;
+}
+.playlist-list.align-left { align-items: flex-start; }
+.playlist-list.align-right { align-items: flex-end; }
+.playlist-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: var(--editor-cover-size, 5rem);
+    padding: .35rem;
+    border-radius: .5rem;
+    cursor: default;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+.playlist-card.current-row { background: #2a2650; }
+.playlist-card.selected-row { outline: 2px solid #8a7cff; outline-offset: -2px; }
+.playlist-card.drop-target { box-shadow: inset 0 3px 0 #8a7cff; }
+.playlist-list.align-right .playlist-card { align-items: flex-end; }
+.playlist-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: .25rem;
+    margin-bottom: .2rem;
+    font-variant-numeric: tabular-nums;
+}
+.playlist-list.align-right .playlist-card-head { justify-content: flex-start; }
+.playlist-card-cover-wrap { position: relative; width: 100%; }
+.playlist-card-position {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    min-width: 1.6rem;
+    padding: .1rem .35rem;
+    border-radius: 0 0 .35rem 0;
+    background: rgb(0 0 0 / 65%);
+    color: #fff;
+    font-size: .8rem;
+    text-align: center;
+    cursor: pointer;
+}
+.playlist-list.align-right .playlist-card-position { left: auto; right: 0; border-radius: 0 0 0 .35rem; }
+.playlist-card-position input {
+    width: 2.6rem;
+    padding: .15rem .25rem;
+    border: 1px solid #5c637b;
+    border-radius: .3rem;
+    background: #10131b;
+    color: #fff;
+}
+.playlist-card-cover { width: 100%; height: var(--editor-cover-size, 5rem); cursor: grab; }
+.playlist-card-cover:active { cursor: grabbing; }
+.playlist-card-artist, .playlist-card-title {
+    width: 100%;
+    margin-top: .2rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.playlist-list.align-right .playlist-card-artist,
+.playlist-list.align-right .playlist-card-title { text-align: right; }
+.playlist-card-artist { font-weight: 600; }
+.playlist-card-title { opacity: .85; }
 
 .insert-overlay {
     position: absolute;

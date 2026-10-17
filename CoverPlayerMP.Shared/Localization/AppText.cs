@@ -122,6 +122,10 @@ public sealed class AppText
     public string CoverSize => T("Cover-Größe", "Cover size", "Taille des pochettes");
     public string CoverSizeTooltip(int size) => T($"Größe der Cover in der Playlistbearbeitung: {size} rem", $"Cover size in playlist editor: {size} rem", $"Taille des pochettes dans l’éditeur de playlist : {size} rem");
     public string LanguageLabel => T("Sprache", "Language", "Langue");
+    public string PlaylistLayoutLabel => T("Playlist-Darstellung", "Playlist layout", "Affichage de la playlist");
+    public string PlaylistLayoutTable => T("Tabelle", "Table", "Tableau");
+    public string PlaylistLayoutLeft => T("Linksbündig", "Left-aligned", "Aligné à gauche");
+    public string PlaylistLayoutRight => T("Rechtsbündig", "Right-aligned", "Aligné à droite");
     public string LanguageAuto => T("Automatisch", "Automatic", "Automatique");
     public string Animations => T("Animationen", "Animations", "Animations");
     public string RemotePlayback => T("Wiedergabe auf anderen Geräten", "Playback on other devices", "Lecture sur d'autres appareils");
