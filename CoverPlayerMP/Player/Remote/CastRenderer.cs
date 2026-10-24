@@ -63,11 +63,23 @@ internal sealed class CastRenderer(ChromecastReceiver receiver) : RemoteRenderer
 
     public override Task<double?> GetVolumeAsync() => Task.FromResult<double?>(lastVolume);
 
-    public override Task<RemoteStatus?> QueryStatusAsync()
+    public override async Task<RemoteStatus?> QueryStatusAsync()
     {
-        var status = client.MediaChannel.MediaStatus;
+        // client.MediaChannel.MediaStatus liefert nur den zuletzt vom Gerät gesendeten (gepushten) Status
+        // und enthält daher keine fortlaufend aktualisierte Position. GetMediaStatusAsync() fragt aktiv
+        // beim Chromecast nach und liefert die aktuelle Wiedergabeposition, damit die Fortschrittsanzeige
+        // auch während laufender Wiedergabe (ohne Play/Pause/Seek) weiterläuft.
+        MediaStatus? status;
+        try
+        {
+            status = await client.MediaChannel.GetMediaStatusAsync();
+        }
+        catch (Exception)
+        {
+            status = client.MediaChannel.MediaStatus;
+        }
         if (status is null)
-            return Task.FromResult<RemoteStatus?>(null);
+            return null;
 
         var state = status.PlayerState.ToString() switch
         {
@@ -77,7 +89,7 @@ internal sealed class CastRenderer(ChromecastReceiver receiver) : RemoteRenderer
             "IDLE" or "Idle" => RemoteState.Stopped,
             _ => RemoteState.Unknown
         };
-        return Task.FromResult<RemoteStatus?>(new RemoteStatus(status.CurrentTime, status.Media?.Duration ?? 0, state));
+        return new RemoteStatus(status.CurrentTime, status.Media?.Duration ?? 0, state);
     }
 
     public override async ValueTask DisposeAsync()
