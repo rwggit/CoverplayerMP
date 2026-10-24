@@ -8,7 +8,9 @@
 
 <PageTitle>CoverPlayerMP</PageTitle>
 
-<div class="player-shell" @onclick="ShowControls">
+<div class="player-shell @(PlaylistSplitActive ? (playlistLayout == PlaylistLayout.Left ? "player-shell-split-left" : "player-shell-split-right") : null)"
+     style="@(PlaylistSplitActive ? $"--editor-pane-width: {editorPaneWidth.ToString(System.Globalization.CultureInfo.InvariantCulture)}px;" : null)"
+     @onclick="ShowControls">
     <div class="bottom-hotspot" @onmouseenter="ShowControls"></div>
     @if (WindowControls is { } windowControls)
     {
@@ -88,7 +90,7 @@
             </section>
         </div>
     }
-    <div class="cover-stage"
+    <div class="cover-stage @(PlaylistSplitActive ? "cover-stage-split" : null)"
          @onpointerdown="OnSwipeStart"
          @onpointerup="OnSwipeEndAsync"
          @onpointercancel="() => swipeStart = null">
@@ -98,6 +100,16 @@
             <div class="cover-placeholder">♪</div>
         }
     </div>
+    @if (PlaylistSplitActive)
+    {
+        <div class="pane-resizer" title="@Text.PlaylistPaneResizerTitle" aria-label="@Text.PlaylistPaneResizerTitle"
+             @onpointerdown="BeginPaneResize" @onclick:stopPropagation="true"></div>
+    }
+    @if (isDraggingPane)
+    {
+        <div class="pane-resize-overlay" @onpointermove="OnPaneResizeMove" @onpointerup="EndPaneResize"
+             @onpointercancel="EndPaneResize" @onclick:stopPropagation="true"></div>
+    }
     <div class="track-caption">
         <span>@(Player.CurrentTrack?.Artist ?? "CoverPlayerMP")</span>
         <span class="caption-separator">—</span>
@@ -276,7 +288,7 @@
 
     @if (editorVisible && !libraryVisible)
     {
-        <section class="library-dialog @(playlistLayout switch { PlaylistLayout.Left => "library-dialog-narrow library-dialog-left", PlaylistLayout.Right => "library-dialog-narrow library-dialog-right", _ => null })" style="--editor-cover-size: @(editorCoverSize)rem; @SubDialogOpacityVars" @onclick:stopPropagation="true">
+        <section class="library-dialog @(playlistLayout == PlaylistLayout.Table ? null : "library-dialog-pane")" style="--editor-cover-size: @(EditorCoverSizeRem.ToString(System.Globalization.CultureInfo.InvariantCulture))rem; @SubDialogOpacityVars" @onclick:stopPropagation="true">
             <div class="control-dialog-header">
                 <span>@Text.EditPlaylist (@FilteredPlaylist.Count() @Text.Of @Player.Tracks.Count)</span>
                 <button class="close-button" title="@Text.Close" @onclick="CloseEditor">×</button>
@@ -927,6 +939,70 @@
     private enum PlaylistLayout { Table, Left, Right }
     private PlaylistLayout playlistLayout = PlaylistLayout.Table;
 
+    // Bei Left/Right wird das Cover-Panel durch ein verstellbares Playlist-Panel geteilt,
+    // statt die Playlist als Overlay über dem Cover anzuzeigen (nur solange der Editor offen ist).
+    private bool PlaylistSplitActive => editorVisible && !libraryVisible && playlistLayout != PlaylistLayout.Table;
+
+    private const double EditorPaneWidthMin = 180;
+    private const double EditorPaneWidthMax = 640;
+    private const double EditorPaneWidthDefault = 280;
+    // Grober horizontaler "Chrome"-Abzug (Panel- und Karten-Padding), damit die Cover-Kante
+    // nicht am Panelrand anstößt, wenn die Größe aus der Panelbreite abgeleitet wird.
+    private const double SplitCoverHorizontalChromePx = 56;
+    private double editorPaneWidth = EditorPaneWidthDefault;
+    // Für die Bitmap-Decodierauflösung wird absichtlich nicht die live während des Ziehens
+    // laufende editorPaneWidth verwendet, sondern ein nur bei Drag-Ende aktualisierter Wert:
+    // Jede Breitenänderung würde sonst den Cache-Key aller sichtbaren Cover ändern und laufend
+    // neue Decodier-Tasks auslösen (führte auf Android zu "App reagiert nicht"-Hängern).
+    private double editorPaneWidthSettled = EditorPaneWidthDefault;
+    private bool isDraggingPane;
+
+    // Im Split-Modus (Playlist links/rechts neben dem Cover) richtet sich die Cover-Darstellungsgröße
+    // automatisch nach der vom Anwender gezogenen Panelbreite; die CoverSize-Einstellung gilt dann nur
+    // noch für die zentrierte Tabellen-/Kartenansicht.
+    private double EditorCoverSizeRem => PlaylistSplitActive
+        ? Math.Clamp((editorPaneWidth - SplitCoverHorizontalChromePx) / 16.0, 3, 24)
+        : editorCoverSize;
+
+    // Grundlage für die Bitmap-Pixelgröße: reagiert nicht auf jede Zwischenposition beim Ziehen,
+    // sondern nur auf die zuletzt "fertig gezogene" Panelbreite.
+    private double EditorCoverPixelSizeRem => PlaylistSplitActive
+        ? Math.Clamp((editorPaneWidthSettled - SplitCoverHorizontalChromePx) / 16.0, 3, 24)
+        : editorCoverSize;
+    private double paneDragStartX;
+    private double paneDragStartWidth;
+
+    private void BeginPaneResize(PointerEventArgs e)
+    {
+        isDraggingPane = true;
+        paneDragStartX = e.ClientX;
+        paneDragStartWidth = editorPaneWidth;
+    }
+
+    private void OnPaneResizeMove(PointerEventArgs e)
+    {
+        if (!isDraggingPane)
+            return;
+
+        var delta = e.ClientX - paneDragStartX;
+        // Beim linksbündigen Layout liegt das Panel links vom Resizer: Ziehen nach rechts vergrößert es.
+        // Beim rechtsbündigen Layout liegt es rechts vom Resizer: Ziehen nach links vergrößert es.
+        if (playlistLayout == PlaylistLayout.Right)
+            delta = -delta;
+
+        editorPaneWidth = Math.Clamp(paneDragStartWidth + delta, EditorPaneWidthMin, EditorPaneWidthMax);
+    }
+
+    private async Task EndPaneResize(PointerEventArgs e)
+    {
+        if (!isDraggingPane)
+            return;
+
+        isDraggingPane = false;
+        editorPaneWidthSettled = editorPaneWidth;
+        await SaveSettingAsync(EditorPaneWidthKey, editorPaneWidth.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
     private async Task SetPlaylistLayoutAsync(PlaylistLayout layout)
     {
         if (playlistLayout == layout)
@@ -1330,6 +1406,7 @@
         $"--subdialog-emphasis-opacity:{SubDialogEmphasisOpacity.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)};" +
         $"--subdialog-strong-opacity:{SubDialogStrongOpacity.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)};";
     private const string PlaylistLayoutKey = "coverPlayer.playlistLayout";
+    private const string EditorPaneWidthKey = "coverPlayer.editorPaneWidth";
     private const string LanguageKey = "coverPlayer.language";
     private const string ServerUrlKey = "coverPlayer.serverUrl";
     private const string ServerUserKey = "coverPlayer.serverUser";
@@ -1389,6 +1466,14 @@
             var layout = await Js.InvokeAsync<string?>("localStorage.getItem", PlaylistLayoutKey);
             if (Enum.TryParse<PlaylistLayout>(layout, out var parsedLayout))
                 playlistLayout = parsedLayout;
+
+            var paneWidth = await Js.InvokeAsync<string?>("localStorage.getItem", EditorPaneWidthKey);
+            if (double.TryParse(paneWidth, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var parsedPaneWidth))
+            {
+                editorPaneWidth = Math.Clamp(parsedPaneWidth, EditorPaneWidthMin, EditorPaneWidthMax);
+                editorPaneWidthSettled = editorPaneWidth;
+            }
 
             var language = await Js.InvokeAsync<string?>("localStorage.getItem", LanguageKey);
             if (Enum.TryParse<AppLanguage>(language, out var appLanguage))
@@ -1867,9 +1952,10 @@
     private static string EditorDetailsKey(Track track, int pixelSize) =>
         track.Source + "|" + (track.CoverSource ?? string.Empty) + "|" + pixelSize;
 
-    // Zielauflösung des Covers in Pixel: an die eingestellte Darstellungsgröße (in rem) gekoppelt und mit einem
-    // Faktor für hochauflösende (Retina/HiDPI) Displays versehen, damit das Cover nicht unscharf wirkt.
-    private int EditorCoverPixelSize => Math.Clamp(editorCoverSize * 16 * 3, 160, 1152);
+    // Zielauflösung des Covers in Pixel: an die tatsächliche Darstellungsgröße (in rem, im Split-Modus aus
+    // der Panelbreite abgeleitet) gekoppelt und mit einem Faktor für hochauflösende (Retina/HiDPI) Displays
+    // versehen, damit das Cover nicht unscharf wirkt.
+    private int EditorCoverPixelSize => Math.Clamp((int)Math.Round(EditorCoverPixelSizeRem * 16 * 3), 160, 1152);
 
     private EditorDetails GetEditorDetails(Track track)
     {

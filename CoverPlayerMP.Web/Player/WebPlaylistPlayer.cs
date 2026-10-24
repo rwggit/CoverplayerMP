@@ -1,11 +1,13 @@
+using CoverPlayerMP.Shared.Localization;
 using CoverPlayerMP.Shared.Player;
 using Microsoft.JSInterop;
 
 namespace CoverPlayerMP.Web.Player;
 
-public sealed class WebPlaylistPlayer(IJSRuntime js) : IPlaylistPlayer
+public sealed class WebPlaylistPlayer(IJSRuntime js, AppText text) : IPlaylistPlayer
 {
     private readonly IJSRuntime js = js;
+    private readonly AppText text = text;
     private List<Track> tracks = [];
     public bool IsPlaylistModified { get; private set; }
     public bool CanQuit => false;
@@ -16,6 +18,7 @@ public sealed class WebPlaylistPlayer(IJSRuntime js) : IPlaylistPlayer
     private bool isPaused;
     private double position;
     private double duration;
+    private string? errorMessage;
 
     public event EventHandler? StateChanged;
     public IReadOnlyList<Track> Tracks => tracks;
@@ -36,7 +39,7 @@ public sealed class WebPlaylistPlayer(IJSRuntime js) : IPlaylistPlayer
     public double CrossfadeSeconds { get => crossfadeSeconds; set => crossfadeSeconds = Math.Clamp(value, 0, 5); }
     public bool IsPlaying => isPlaying;
     public bool IsPaused => isPaused;
-    public string? ErrorMessage => null;
+    public string? ErrorMessage => errorMessage;
 
     public async Task OpenPlaylistAsync(CancellationToken cancellationToken = default)
     {
@@ -63,9 +66,22 @@ public sealed class WebPlaylistPlayer(IJSRuntime js) : IPlaylistPlayer
         if (tracks.Count == 0)
             return;
         currentIndex = Math.Clamp(index, 0, tracks.Count - 1);
-        await js.InvokeVoidAsync("coverPlayer.loadAndPlay", cancellationToken, tracks[currentIndex].Source, volume);
-        isPlaying = true;
-        isPaused = false;
+        var track = tracks[currentIndex];
+        try
+        {
+            await js.InvokeVoidAsync("coverPlayer.loadAndPlay", cancellationToken, track.Source, volume);
+            errorMessage = null;
+            isPlaying = true;
+            isPaused = false;
+        }
+        catch (JSException ex)
+        {
+            // Kann z. B. bei nicht unterstützten Audioformaten oder nicht erreichbaren Quellen auftreten.
+            // Darf den Circuit nicht zum Absturz bringen, daher hier abfangen und als Fehlermeldung anzeigen.
+            errorMessage = text.ErrorCannotPlay(track.Title, ex.Message);
+            isPlaying = false;
+            isPaused = false;
+        }
         await UpdateStateAsync(cancellationToken);
     }
 

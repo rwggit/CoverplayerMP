@@ -11,6 +11,65 @@
     user-select: none;
 }
 
+/* Links-/Rechtsbündige Playlistansicht: Cover-Bereich und Playlist-Panel liegen als
+   Grid-Spalten nebeneinander, getrennt durch einen ziehbaren Resizer. Alle anderen
+   Overlays (Steuerung, Bibliothek, Dialoge) bleiben unverändert position: absolute
+   und sind daher nicht Teil des Grid-Layouts. */
+.player-shell-split-left,
+.player-shell-split-right {
+    display: grid;
+    grid-template-columns: var(--editor-pane-width, 280px) auto 1fr;
+    /* Ohne explizite Zeilenhöhe bemisst sich die einzige Grid-Zeile nach dem natürlichen
+       Inhalt der Items (statt nach der vollen Höhe von .player-shell) – das ließ Cover,
+       Resizer und Playlist-Panel auf die (geringere) Inhaltshöhe des Panels schrumpfen. */
+    grid-template-rows: 1fr;
+    align-items: stretch;
+}
+.player-shell-split-right {
+    grid-template-columns: 1fr auto var(--editor-pane-width, 280px);
+}
+.player-shell-split-left .cover-stage-split,
+.player-shell-split-right .cover-stage-split,
+.player-shell-split-left .pane-resizer,
+.player-shell-split-right .pane-resizer,
+.player-shell-split-left .library-dialog-pane,
+.player-shell-split-right .library-dialog-pane {
+    grid-row: 1;
+}
+
+.pane-resizer {
+    position: relative;
+    grid-column: 2;
+    width: .6rem;
+    cursor: col-resize;
+    background: transparent;
+    touch-action: none;
+}
+.pane-resizer::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 2px;
+    transform: translateX(-50%);
+    background: #51576d;
+}
+.pane-resizer:hover::after,
+.player-shell-split-left .pane-resizer:active::after,
+.player-shell-split-right .pane-resizer:active::after {
+    background: #8c91a3;
+}
+/* Während des Ziehens: deckt den gesamten Player ab, damit Pointer-Bewegungen auch
+   außerhalb des schmalen Resizers erfasst werden (Blazor kennt kein Pointer Capture). */
+.pane-resize-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    cursor: col-resize;
+    touch-action: none;
+}
+
 .window-hotspot {
     position: absolute;
     top: 0;
@@ -111,6 +170,18 @@
     background: radial-gradient(circle, #272a35 0, #090a0f 75%);
     touch-action: pan-y;
 }
+/* Im Split-Layout (Links/Rechts) ist das Cover-Panel ein Grid-Item neben dem
+   Playlist-Panel statt eines vollflächigen Overlays. */
+.cover-stage-split {
+    position: relative;
+    inset: auto;
+    box-sizing: border-box;
+    padding-bottom: 3.5rem;
+}
+.player-shell-split-left .cover-stage-split { grid-column: 3; }
+.player-shell-split-right .cover-stage-split { grid-column: 1; }
+.player-shell-split-left .pane-resizer { grid-column: 2; }
+.player-shell-split-right .pane-resizer { grid-column: 2; }
 
 .cover-image {
     display: block;
@@ -366,24 +437,36 @@ button:disabled { cursor: not-allowed; opacity: .45; }
     box-shadow: 0 1rem 3rem rgb(0 0 0 / 45%);
     user-select: text;
 }
-/* Linksbündige/rechtsbündige Playlistansicht: nur eine Spalte, daher Dialogbreite an die
-   Coverbreite koppeln statt den gesamten verfügbaren Platz zu belegen, und den Dialog an
-   den linken bzw. rechten Rand andocken statt ihn zu zentrieren. */
-.library-dialog-narrow {
-    width: max(calc(var(--editor-cover-size, 5rem) + 3.5rem), 11rem);
-    max-width: calc(100% - 2rem);
-    overflow-x: hidden;
+/* Linksbündige/rechtsbündige Playlistansicht: eigenes Grid-Panel neben dem Cover
+   (statt schwebendem Overlay darüber), dessen Breite der Anwender per Resizer anpasst. */
+.library-dialog-pane {
+    position: relative;
+    inset: auto;
+    width: auto;
+    max-width: none;
+    /* Grid-Items haben standardmäßig min-width: auto, d.h. breiter Tabelleninhalt würde die
+       Spaltenbreite sonst über --editor-pane-width hinaus aufziehen und den Resizer verdecken. */
+    min-width: 0;
+    box-sizing: border-box;
+    margin: calc(1rem + env(safe-area-inset-top, 0px)) 0 4.25rem;
+    overflow: hidden;
+    /* Als eigenes Panel neben dem Cover braucht die Playlist keinen Rahmen/Schatten mehr –
+       die Grid-Spaltengrenze bzw. der Resizer trennt die Bereiche bereits optisch. */
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
 }
-.library-dialog-left { right: auto; }
-.library-dialog-right { left: auto; }
-/* Im schmalen Dialog reicht die Breite oft nicht für Suchfeld + Schaltflächen in einer Zeile;
-   daher umbrechen und das Suchfeld auf eine eigene Zeile stellen. */
-.library-dialog-narrow .editor-toolbar { flex-wrap: wrap; }
-.library-dialog-narrow .editor-toolbar .editor-search { flex: 1 1 100%; min-width: 0; }
-.library-dialog-narrow .editor-toolbar button { flex: 0 0 auto; }
-.library-dialog-narrow .editor-toolbar-layout-buttons { flex: 1 1 100%; justify-content: flex-end; }
-.library-dialog-narrow .selection-toolbar { flex-wrap: wrap; }
-.library-dialog-narrow .selection-toolbar span { flex: 1 1 100%; min-width: 0; }
+.player-shell-split-left .library-dialog-pane { grid-column: 1; margin-left: 1rem; margin-right: 0; }
+.player-shell-split-right .library-dialog-pane { grid-column: 3; margin-right: 1rem; margin-left: 0; }
+/* Im schmalen Panel reicht die Breite oft nicht für Suchfeld + Schaltflächen in einer Zeile;
+   daher erlauben wir Umbruch, erzwingen ihn aber nicht mehr pauschal – so bleibt alles in
+   einer Zeile, solange der Anwender das Panel breit genug gezogen hat. */
+.library-dialog-pane .editor-toolbar { flex-wrap: wrap; }
+.library-dialog-pane .editor-toolbar .editor-search { flex: 1 1 6rem; min-width: 6rem; }
+.library-dialog-pane .editor-toolbar button { flex: 0 0 auto; }
+.library-dialog-pane .editor-toolbar-layout-buttons { justify-content: flex-end; }
+.library-dialog-pane .selection-toolbar { flex-wrap: wrap; }
+.library-dialog-pane .selection-toolbar span { flex: 1 1 auto; min-width: 6rem; }
 .library-status { padding: 1rem; color: #c9cde0; }
 .library-table-wrapper { flex: 1; min-height: 0; overflow: auto; }
 .library-table { width: 100%; border-collapse: collapse; }
@@ -410,7 +493,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 }
 .library-table td:last-child, .library-table th:last-child { width: 5.5rem; font-variant-numeric: tabular-nums; }
 @media (max-width: 600px) {
-    .library-dialog { right: .5rem; left: .5rem; padding: .5rem .5rem .75rem; }
+    .library-dialog:not(.library-dialog-pane) { right: .5rem; left: .5rem; padding: .5rem .5rem .75rem; }
     .library-table th, .library-table td { padding: .3rem .25rem; font-size: .85rem; }
     .library-table td:last-child, .library-table th:last-child { width: 4.5rem; }
 }
