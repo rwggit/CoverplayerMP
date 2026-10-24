@@ -56,6 +56,14 @@ window.coverPlayerKeyboard = (() => {
         }
     };
 })();
+window.coverPlayerEditor = (() => {
+    function scrollCurrentIntoView() {
+        const current = document.querySelector(".library-dialog .current-row");
+        current?.scrollIntoView({ block: "center", behavior: "auto" });
+    }
+
+    return { scrollCurrentIntoView };
+})();
 window.coverPlayerDragScroll = (() => {
     const edge = 60;
     const maxSpeed = 18;

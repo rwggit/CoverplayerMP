@@ -43,7 +43,7 @@
     }
     @if (serverDialogVisible)
     {
-        <div class="insert-overlay" @onclick:stopPropagation="true">
+        <div class="insert-overlay" style="@SubDialogOpacityVars" @onclick:stopPropagation="true">
             <section class="insert-dialog">
                 <div class="control-dialog-header">
                     <span>@Text.ServerDialogTitle</span>
@@ -111,7 +111,7 @@
 
     @if (controlsVisible)
     {
-        <section class="control-dialog" @onclick:stopPropagation="true">
+        <section class="control-dialog" style="@SubDialogOpacityVars" @onclick:stopPropagation="true">
             <div class="control-dialog-header">
                 <span>@Text.PlayerControls</span>
                 <button class="close-button" title="@Text.Settings" aria-label="@Text.Settings" @onclick="OpenOptions">
@@ -233,7 +233,7 @@
 
     @if (libraryVisible)
     {
-        <section class="library-dialog" @onclick:stopPropagation="true">
+        <section class="library-dialog" style="@SubDialogOpacityVars" @onclick:stopPropagation="true">
             <div class="control-dialog-header">
                 <span>@Text.AudioFiles (@FilteredLibrary.Count() @Text.Of @libraryTracks.Count)</span>
                 <button class="close-button" title="@Text.Close" @onclick="CloseLibrary">×</button>
@@ -276,7 +276,7 @@
 
     @if (editorVisible && !libraryVisible)
     {
-        <section class="library-dialog @(playlistLayout switch { PlaylistLayout.Left => "library-dialog-narrow library-dialog-left", PlaylistLayout.Right => "library-dialog-narrow library-dialog-right", _ => null })" style="--editor-cover-size: @(editorCoverSize)rem;" @onclick:stopPropagation="true">
+        <section class="library-dialog @(playlistLayout switch { PlaylistLayout.Left => "library-dialog-narrow library-dialog-left", PlaylistLayout.Right => "library-dialog-narrow library-dialog-right", _ => null })" style="--editor-cover-size: @(editorCoverSize)rem; @SubDialogOpacityVars" @onclick:stopPropagation="true">
             <div class="control-dialog-header">
                 <span>@Text.EditPlaylist (@FilteredPlaylist.Count() @Text.Of @Player.Tracks.Count)</span>
                 <button class="close-button" title="@Text.Close" @onclick="CloseEditor">×</button>
@@ -505,7 +505,7 @@
 
     @if (removingTrack is not null)
     {
-        <div class="insert-overlay busy-overlay" @onclick:stopPropagation="true">
+        <div class="insert-overlay busy-overlay" style="@SubDialogOpacityVars" @onclick:stopPropagation="true">
             <section class="insert-dialog" role="alertdialog" aria-live="assertive">
                 <span class="busy-spinner" aria-hidden="true"></span>
                 <span>@removingTrack</span>
@@ -515,7 +515,7 @@
 
     @if (pendingTrack is not null)
     {
-        <div class="insert-overlay" @onclick:stopPropagation="true">
+        <div class="insert-overlay" style="@SubDialogOpacityVars" @onclick:stopPropagation="true">
             <section class="insert-dialog">
                 <div class="control-dialog-header">
                     <span>@Text.InsertTrack(pendingTrack.Title)</span>
@@ -532,7 +532,7 @@
 
     @if (trackInfo is not null)
     {
-        <div class="insert-overlay" @onclick="CloseTrackInfo" @onclick:stopPropagation="true">
+        <div class="insert-overlay" style="@SubDialogOpacityVars" @onclick="CloseTrackInfo" @onclick:stopPropagation="true">
             <section class="info-dialog" @onclick:stopPropagation="true">
                 <div class="control-dialog-header">
                     <span>@Text.TrackDetails</span>
@@ -563,7 +563,7 @@
 
     @if (rawTags is not null)
     {
-        <div class="insert-overlay" @onclick="CloseRawTags" @onclick:stopPropagation="true">
+        <div class="insert-overlay" style="@SubDialogOpacityVars" @onclick="CloseRawTags" @onclick:stopPropagation="true">
             <section class="info-dialog" @onclick:stopPropagation="true">
                 <div class="control-dialog-header">
                     <span>@Text.TagContents</span>
@@ -585,7 +585,7 @@
     }
     @if (pictures is not null)
     {
-        <div class="insert-overlay" @onclick="ClosePictures" @onclick:stopPropagation="true">
+        <div class="insert-overlay" style="@SubDialogOpacityVars" @onclick="ClosePictures" @onclick:stopPropagation="true">
             <section class="info-dialog" @onclick:stopPropagation="true">
                 <div class="control-dialog-header">
                     <span>@Text.CoverPictures</span>
@@ -627,7 +627,7 @@
     }
     @if (optionsVisible)
     {
-        <div class="insert-overlay" @onclick="CloseOptions" @onclick:stopPropagation="true">
+        <div class="insert-overlay" style="@SubDialogOpacityVars" @onclick="CloseOptions" @onclick:stopPropagation="true">
             <section class="insert-dialog" @onclick:stopPropagation="true">
                 <div class="control-dialog-header">
                     <span>@Text.Settings</span>
@@ -663,6 +663,14 @@
                                value="@editorCoverSize"
                                @oninput="OnEditorCoverSizeChanged" />
                         <span class="setting-value">@editorCoverSize rem</span>
+                    </label>
+                    <label class="setting-row">
+                        <span>Durchsichtigkeit Unterdialoge</span>
+                        <input type="range" min="0" max="100" step="1"
+                               title="@($"{subDialogTransparencyPercent} %")"
+                               value="@subDialogTransparencyPercent"
+                               @oninput="OnSubDialogTransparencyChanged" />
+                        <span class="setting-value">@subDialogTransparencyPercent %</span>
                     </label>
                     <label class="setting-row">
                         <span>@Text.PlaylistLayoutLabel</span>
@@ -732,7 +740,7 @@
     }
     @if (animationChoices is not null)
     {
-        <div class="insert-overlay" @onclick="CloseAnimations" @onclick:stopPropagation="true">
+        <div class="insert-overlay" style="@SubDialogOpacityVars" @onclick="CloseAnimations" @onclick:stopPropagation="true">
             <section class="info-dialog" @onclick:stopPropagation="true">
                 <div class="control-dialog-header">
                     <span>@Text.Animations (@animationChoices.Count(a => a.Active) @Text.Of @animationChoices.Count)</span>
@@ -768,7 +776,7 @@
     }
     @if (remoteDialogVisible)
     {
-        <div class="insert-overlay" @onclick="CloseRemoteDialog" @onclick:stopPropagation="true">
+        <div class="insert-overlay" style="@SubDialogOpacityVars" @onclick="CloseRemoteDialog" @onclick:stopPropagation="true">
             <section class="info-dialog" @onclick:stopPropagation="true">
                 <div class="control-dialog-header">
                     <span>@Text.RemotePlayback</span>
@@ -806,6 +814,8 @@
     private bool controlsVisible;
     private IWindowControls? WindowControls => (IWindowControls?)Services.GetService(typeof(IWindowControls));
     private bool windowButtonsVisible;
+
+    private void HideControlsForSubDialog() => controlsVisible = false;
 
     private void UpdateWindowButtons() => windowButtonsVisible = WindowControls?.IsFullScreen == true;
 
@@ -951,6 +961,7 @@
     // Abspielen begonnen hat; nur daraus lassen sich ID3-Tags auslesen (die Quelle selbst bleibt eine URL).
     private void ShowTrackInfo(Track? track)
     {
+        HideControlsForSubDialog();
         infoSource = LocalMetadataSource(track);
         trackInfo = TrackMetadata.Read(infoSource, Text);
     }
@@ -965,13 +976,21 @@
 
     private IReadOnlyList<KeyValuePair<string, string>>? rawTags;
 
-    private void ShowRawTags() => rawTags = TrackMetadata.ReadRawTags(infoSource, Text);
+    private void ShowRawTags()
+    {
+        HideControlsForSubDialog();
+        rawTags = TrackMetadata.ReadRawTags(infoSource, Text);
+    }
 
     private void CloseRawTags() => rawTags = null;
 
     private IReadOnlyList<KeyValuePair<string, string>>? pictures;
 
-    private void ShowPictures() => pictures = TrackMetadata.ReadPictures(infoSource);
+    private void ShowPictures()
+    {
+        HideControlsForSubDialog();
+        pictures = TrackMetadata.ReadPictures(infoSource);
+    }
 
     private void ClosePictures()
     {
@@ -1084,6 +1103,7 @@
 
     private void OpenOptions()
     {
+        HideControlsForSubDialog();
         quitConfirmVisible = false;
         optionsVisible = true;
     }
@@ -1137,6 +1157,7 @@
 
     private async Task OpenRemoteDevicesAsync()
     {
+        HideControlsForSubDialog();
         remoteDialogVisible = true;
         remoteSearching = true;
         remoteDevices = null;
@@ -1160,6 +1181,7 @@
 
     private async Task OpenAnimationsAsync()
     {
+        HideControlsForSubDialog();
         try
         {
             animationChoices = (await Js.InvokeAsync<AnimationChoice[]>("coverTransition.getAnimations", Text.Code)).ToList();
@@ -1275,6 +1297,12 @@
                 await Js.InvokeVoidAsync("coverTransition.show", coverCanvas, coverUri, duration);
             }
 
+            if (scrollToCurrentTrackPending && !disposed)
+            {
+                scrollToCurrentTrackPending = false;
+                await Js.InvokeVoidAsync("coverPlayerEditor.scrollCurrentIntoView");
+            }
+
             if (!firstRender || disposed)
                 return;
 
@@ -1292,6 +1320,15 @@
     private const string CoverFadeKey = "coverPlayer.coverFadeSeconds";
     private double coverFadeSeconds = 2;
     private const string EditorCoverSizeKey = "coverPlayer.editorCoverSize";
+    private const string SubDialogTransparencyKey = "coverPlayer.subDialogTransparencyPercent";
+    private int subDialogTransparencyPercent = 0;
+    private double SubDialogSurfaceOpacity => Math.Clamp((100 - subDialogTransparencyPercent) / 100d, 0, 1);
+    private double SubDialogEmphasisOpacity => Math.Clamp(SubDialogSurfaceOpacity + 0.22, 0.22, 1);
+    private double SubDialogStrongOpacity => Math.Clamp(SubDialogSurfaceOpacity + 0.32, 0.32, 1);
+    private string SubDialogOpacityVars =>
+        $"--subdialog-surface-opacity:{SubDialogSurfaceOpacity.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)};" +
+        $"--subdialog-emphasis-opacity:{SubDialogEmphasisOpacity.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)};" +
+        $"--subdialog-strong-opacity:{SubDialogStrongOpacity.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)};";
     private const string PlaylistLayoutKey = "coverPlayer.playlistLayout";
     private const string LanguageKey = "coverPlayer.language";
     private const string ServerUrlKey = "coverPlayer.serverUrl";
@@ -1344,6 +1381,10 @@
             var coverSize = await Js.InvokeAsync<string?>("localStorage.getItem", EditorCoverSizeKey);
             if (int.TryParse(coverSize, out var size))
                 editorCoverSize = Math.Clamp(size, 3, 24);
+
+            var subDialogTransparency = await Js.InvokeAsync<string?>("localStorage.getItem", SubDialogTransparencyKey);
+            if (int.TryParse(subDialogTransparency, out var parsedSubDialogTransparency))
+                subDialogTransparencyPercent = Math.Clamp(parsedSubDialogTransparency, 0, 100);
 
             var layout = await Js.InvokeAsync<string?>("localStorage.getItem", PlaylistLayoutKey);
             if (Enum.TryParse<PlaylistLayout>(layout, out var parsedLayout))
@@ -1537,6 +1578,7 @@
     private enum EditorSortColumn { Position, Artist, Title }
 
     private bool editorVisible;
+    private bool scrollToCurrentTrackPending;
     private string editorSearch = string.Empty;
     private EditorSortColumn editorSortColumn = EditorSortColumn.Position;
     private bool editorSortDescending;
@@ -1619,9 +1661,11 @@
 
     private void OpenEditor()
     {
+        HideControlsForSubDialog();
         editorVisible = true;
         editingIndex = null;
         ClearSelection();
+        scrollToCurrentTrackPending = true;
     }
 
     private void CloseEditor()
@@ -1921,6 +1965,7 @@
 
     private async Task OpenLibraryAsync()
     {
+        HideControlsForSubDialog();
         libraryVisible = true;
         libraryLoading = true;
         StateHasChanged();
@@ -2040,6 +2085,7 @@
             return;
         }
 
+        HideControlsForSubDialog();
         pendingTrack = item.Track;
     }
 
@@ -2115,6 +2161,15 @@
         {
             editorCoverSize = Math.Clamp(value, 3, 24);
             await SaveSettingAsync(EditorCoverSizeKey, editorCoverSize.ToString());
+        }
+    }
+
+    private async Task OnSubDialogTransparencyChanged(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var value))
+        {
+            subDialogTransparencyPercent = Math.Clamp(value, 0, 100);
+            await SaveSettingAsync(SubDialogTransparencyKey, subDialogTransparencyPercent.ToString());
         }
     }
 

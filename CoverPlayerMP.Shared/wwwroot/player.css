@@ -169,7 +169,6 @@
     padding: .75rem 1.25rem 1.25rem;
     border: 1px solid #51576d;
     border-radius: 1rem;
-    background: #181b25;
     user-select: text;
 }
 .info-list {
@@ -236,7 +235,6 @@
     padding: .75rem 1.25rem 1rem;
     border: 1px solid #51576d;
     border-radius: 1rem;
-    background: rgb(24 27 37 / 95%);
     box-shadow: 0 1rem 3rem rgb(0 0 0 / 45%);
 }
 
@@ -365,7 +363,6 @@ button:disabled { cursor: not-allowed; opacity: .45; }
     padding: .75rem 1.25rem 1rem;
     border: 1px solid #51576d;
     border-radius: 1rem;
-    background: rgb(24 27 37 / 97%);
     box-shadow: 0 1rem 3rem rgb(0 0 0 / 45%);
     user-select: text;
 }
@@ -395,7 +392,11 @@ button:disabled { cursor: not-allowed; opacity: .45; }
     border-bottom: 1px solid #373c50;
     text-align: left;
 }
-.library-table th { position: sticky; background: #1d2130; color: #c9cde0; }
+.library-table th {
+    position: sticky;
+    background: rgb(29 33 48 / var(--subdialog-surface-opacity, 1));
+    color: #c9cde0;
+}
 .library-table thead tr:first-child th { top: 0; }
 .library-table thead tr:nth-child(2) th { top: 2.6rem; }
 .library-table th input {
@@ -415,8 +416,14 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 }
 .library-table tbody tr { cursor: pointer; }
 .library-table th.sortable { cursor: pointer; user-select: none; }
-.library-table th.sortable:hover { color: #fff; background: #30364a; }
-.library-table tbody tr:hover { background: #30364a; }
+.library-table th.sortable:hover {
+    color: #fff;
+    background: rgb(48 54 74 / var(--subdialog-emphasis-opacity, .22));
+}
+.library-table tbody tr:hover {
+    background: rgb(48 54 74 / var(--subdialog-emphasis-opacity, .22));
+    box-shadow: inset 0 0 0 1px rgb(138 124 255 / var(--subdialog-emphasis-opacity, .22));
+}
 
 .playlist-buttons { display: flex; gap: .5rem; justify-content: center; }
 .player-buttons { display: flex; gap: .5rem; }
@@ -430,8 +437,15 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 }
 .editor-table thead tr:first-child th { top: 0; }
 .editor-table tbody tr { cursor: default; }
-.editor-table tbody tr.current-row { background: #2a2650; }
-.editor-table tbody tr.selected-row { outline: 2px solid #8a7cff; outline-offset: -2px; }
+.editor-table tbody tr.current-row {
+    background: rgb(42 38 80 / var(--subdialog-strong-opacity, .32));
+    box-shadow: inset 0 0 0 1px rgb(138 124 255 / var(--subdialog-emphasis-opacity, .22));
+}
+.editor-table tbody tr.selected-row {
+    background: rgb(64 57 121 / var(--subdialog-emphasis-opacity, .22));
+    outline: 2px solid rgb(138 124 255 / var(--subdialog-strong-opacity, .32));
+    outline-offset: -2px;
+}
 .busy-overlay { z-index: 30; cursor: progress; }
 .busy-overlay .insert-dialog { flex-direction: row; align-items: center; gap: .75rem; padding: 1.25rem; }
 .busy-overlay .insert-dialog span:not(.busy-spinner) { min-width: 0; overflow-wrap: anywhere; }
@@ -597,6 +611,9 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .playlist-card-title { opacity: .85; }
 
 .insert-overlay {
+    --subdialog-surface-opacity: 1;
+    --subdialog-emphasis-opacity: .22;
+    --subdialog-strong-opacity: .32;
     position: absolute;
     inset: 0;
     z-index: 20;
@@ -604,6 +621,12 @@ button:disabled { cursor: not-allowed; opacity: .45; }
     grid-template: minmax(0, 1fr) / minmax(0, 1fr);
     place-items: center;
     background: rgb(0 0 0 / 55%);
+}
+.insert-overlay .insert-dialog,
+.insert-overlay .info-dialog,
+.control-dialog,
+.library-dialog {
+    background: rgb(24 27 37 / var(--subdialog-surface-opacity, 1));
 }
 .insert-dialog {
     display: flex;
@@ -615,5 +638,4 @@ button:disabled { cursor: not-allowed; opacity: .45; }
     padding: .75rem 1.25rem 1.25rem;
     border: 1px solid #51576d;
     border-radius: 1rem;
-    background: #181b25;
 }
