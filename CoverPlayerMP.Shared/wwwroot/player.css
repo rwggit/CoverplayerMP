@@ -242,6 +242,8 @@
     border: 1px solid #51576d;
     border-radius: 1rem;
     user-select: text;
+    scrollbar-color: #51576d rgb(24 27 37 / var(--subdialog-surface-opacity, 1));
+    scrollbar-width: thin;
 }
 .info-list {
     display: grid;
@@ -471,6 +473,11 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .library-dialog-pane .selection-toolbar span { flex: 1 1 auto; min-width: 6rem; }
 .library-status { padding: 1rem; color: #c9cde0; }
 .library-table-wrapper { flex: 1; min-height: 0; overflow: auto; }
+.library-table-wrapper,
+.insert-dialog {
+    scrollbar-color: #51576d rgb(24 27 37 / var(--subdialog-surface-opacity, 1));
+    scrollbar-width: thin;
+}
 .library-table { width: 100%; border-collapse: collapse; }
 .library-table th, .library-table td {
     padding: .35rem .5rem;
@@ -746,9 +753,30 @@ button:disabled { cursor: not-allowed; opacity: .45; }
     flex-direction: column;
     gap: .5rem;
     min-width: 18rem;
+    max-height: calc(100% - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
     max-width: calc(100% - 2rem);
     box-sizing: border-box;
+    overflow-y: auto;
     padding: .75rem 1.25rem 1.25rem;
     border: 1px solid #51576d;
     border-radius: 1rem;
+}
+.library-table-wrapper::-webkit-scrollbar,
+.insert-dialog::-webkit-scrollbar {
+    width: .7rem;
+    height: .7rem;
+}
+.library-table-wrapper::-webkit-scrollbar-track,
+.insert-dialog::-webkit-scrollbar-track {
+    background: rgb(24 27 37 / var(--subdialog-surface-opacity, 1));
+}
+.library-table-wrapper::-webkit-scrollbar-thumb,
+.insert-dialog::-webkit-scrollbar-thumb {
+    border: 2px solid rgb(24 27 37 / var(--subdialog-surface-opacity, 1));
+    border-radius: .5rem;
+    background: #51576d;
+}
+.library-table-wrapper::-webkit-scrollbar-thumb:hover,
+.insert-dialog::-webkit-scrollbar-thumb:hover {
+    background: #6d7590;
 }
