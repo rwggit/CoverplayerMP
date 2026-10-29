@@ -1,4 +1,5 @@
 ﻿using System.Runtime.CompilerServices;
+using System.Text.Json;
 using Plugin.Maui.Audio;
 using CoverPlayerMP.Shared.Player;
 using CoverPlayerMP.Shared.Localization;
@@ -60,6 +61,8 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
     public bool IsPaused { get; private set; }
     public string? ErrorMessage { get; private set; }
     public bool NeedsMusicFolder { get; private set; }
+    public int LibraryTracksFound { get; private set; }
+    public bool LibraryTracksLoadedFromIndex { get; private set; }
 
 
     public async Task OpenPlaylistAsync(CancellationToken cancellationToken = default)
@@ -281,7 +284,7 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
 
     public Task RestartAsync(CancellationToken cancellationToken = default) => SeekAsync(0, cancellationToken);
 
-    public async Task<IReadOnlyList<LibraryTrack>> GetLibraryTracksAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<LibraryTrack>> GetLibraryTracksAsync(CancellationToken cancellationToken = default, bool refresh = false)
     {
         try
         {
@@ -292,9 +295,17 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
                 return [];
             }
 
-            return await Task.Run(CoverPlayerMP.Platforms.Android.AudioLibrary.Query, cancellationToken);
+            LibraryTracksFound = 0;
+            RaiseStateChanged();
+            var libraryTracks = await Task.Run(CoverPlayerMP.Platforms.Android.AudioLibrary.Query, cancellationToken);
+            LibraryTracksFound = libraryTracks.Count;
+            RaiseStateChanged();
+            return libraryTracks;
 #else
-            return await Task.Run(() => ScanMusicFolderAsync(cancellationToken), cancellationToken);
+            LibraryTracksFound = 0;
+            LibraryTracksLoadedFromIndex = false;
+            RaiseStateChanged();
+            return await Task.Run(() => ScanMusicFolderAsync(cancellationToken, refresh), cancellationToken);
 #endif
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
@@ -306,47 +317,147 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
 
 #if !ANDROID
     private static readonly string[] AudioExtensions = [".mp3", ".wav", ".m4a", ".flac", ".aac", ".ogg", ".opus", ".wma"];
+    private const int MetadataConcurrency = 8;
+    private const int IndexThreshold = 1000;
+    private const string IndexFileName = "CoverPlayerMP.index";
 
-    private static async Task<IReadOnlyList<LibraryTrack>> ScanMusicFolderAsync(CancellationToken cancellationToken)
+    private sealed record LibraryIndexEntry(string Source, string Title, string Artist, TimeSpan Duration);
+
+    private async Task<IReadOnlyList<LibraryTrack>> ScanMusicFolderAsync(CancellationToken cancellationToken, bool refresh)
     {
-        var result = new List<LibraryTrack>();
         var root = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
         if (string.IsNullOrEmpty(root) || !Directory.Exists(root))
-            return result;
+            return [];
+
+        var indexPath = Path.Combine(root, IndexFileName);
+        if (!refresh && File.Exists(indexPath))
+        {
+            var indexedTracks = await LoadLibraryIndexAsync(indexPath, cancellationToken);
+            if (indexedTracks is not null)
+            {
+                LibraryTracksFound = indexedTracks.Count;
+                LibraryTracksLoadedFromIndex = true;
+                RaiseStateChanged();
+                return indexedTracks;
+            }
+        }
 
         var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true };
+        var files = new List<string>();
         foreach (var file in Directory.EnumerateFiles(root, "*", options))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!AudioExtensions.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
                 continue;
 
-            var name = Path.GetFileNameWithoutExtension(file);
-            var separator = name.IndexOf(" - ", StringComparison.Ordinal);
-            var artist = separator > 0 ? name[..separator].Trim() : "Unbekannter Interpret";
-            var title = separator > 0 ? name[(separator + 3)..].Trim() : name;
-            var duration = TimeSpan.Zero;
-#if WINDOWS
-            try
-            {
-                var storageFile = await Windows.Storage.StorageFile.GetFileFromPathAsync(file);
-                var properties = await storageFile.Properties.GetMusicPropertiesAsync();
-                if (!string.IsNullOrWhiteSpace(properties.Artist))
-                    artist = properties.Artist;
-                if (!string.IsNullOrWhiteSpace(properties.Title))
-                    title = properties.Title;
-                duration = properties.Duration;
-            }
-            catch (Exception)
-            {
-            }
-#else
-            await Task.CompletedTask;
-#endif
-            result.Add(new LibraryTrack(new Track(file, title, artist, file), duration));
+            files.Add(file);
         }
 
-        return result;
+        var result = new LibraryTrack?[files.Count];
+        var completed = 0;
+        var progressLock = new object();
+        await Parallel.ForEachAsync(
+            files.Select((file, index) => (file, index)),
+            new ParallelOptions
+            {
+                CancellationToken = cancellationToken,
+                MaxDegreeOfParallelism = MetadataConcurrency
+            },
+            async (item, token) =>
+            {
+                token.ThrowIfCancellationRequested();
+                var file = item.file;
+
+                var name = Path.GetFileNameWithoutExtension(file);
+                var separator = name.IndexOf(" - ", StringComparison.Ordinal);
+                var artist = separator > 0 ? name[..separator].Trim() : "Unbekannter Interpret";
+                var title = separator > 0 ? name[(separator + 3)..].Trim() : name;
+                var duration = TimeSpan.Zero;
+#if WINDOWS
+                try
+                {
+                    var storageFile = await Windows.Storage.StorageFile.GetFileFromPathAsync(file);
+                    var properties = await storageFile.Properties.GetMusicPropertiesAsync();
+                    if (!string.IsNullOrWhiteSpace(properties.Artist))
+                        artist = properties.Artist;
+                    if (!string.IsNullOrWhiteSpace(properties.Title))
+                        title = properties.Title;
+                    duration = properties.Duration;
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception)
+                {
+                }
+#else
+                await Task.CompletedTask;
+#endif
+                result[item.index] = new LibraryTrack(new Track(file, title, artist, file), duration);
+                var count = Interlocked.Increment(ref completed);
+                if (count % 100 == 0)
+                {
+                    lock (progressLock)
+                    {
+                        LibraryTracksFound = count;
+                        RaiseStateChanged();
+                    }
+                }
+            });
+
+        lock (progressLock)
+        {
+            LibraryTracksFound = completed;
+            LibraryTracksLoadedFromIndex = false;
+            RaiseStateChanged();
+        }
+        var tracks = result.Where(track => track is not null).Select(track => track!).ToList();
+        if (tracks.Count > IndexThreshold)
+            await SaveLibraryIndexAsync(indexPath, tracks, cancellationToken);
+        else if (File.Exists(indexPath))
+            File.Delete(indexPath);
+        return tracks;
+    }
+
+    private static async Task<IReadOnlyList<LibraryTrack>?> LoadLibraryIndexAsync(string indexPath, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var stream = File.OpenRead(indexPath);
+            var entries = await JsonSerializer.DeserializeAsync<List<LibraryIndexEntry>>(stream, cancellationToken: cancellationToken);
+            if (entries is null)
+                return null;
+
+            return entries.Select(entry => new LibraryTrack(
+                new Track(entry.Source, entry.Title, entry.Artist, entry.Source), entry.Duration)).ToList();
+        }
+        catch (FileNotFoundException)
+        {
+            return null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static async Task SaveLibraryIndexAsync(string indexPath, IReadOnlyList<LibraryTrack> tracks, CancellationToken cancellationToken)
+    {
+        var temporaryPath = indexPath + ".tmp";
+        var entries = tracks.Select(track => new LibraryIndexEntry(
+            track.Track.Source, track.Track.Title, track.Track.Artist, track.Duration)).ToList();
+        try
+        {
+            await using (var stream = File.Create(temporaryPath))
+                await JsonSerializer.SerializeAsync(stream, entries, cancellationToken: cancellationToken);
+            File.Move(temporaryPath, indexPath, true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+                File.Delete(temporaryPath);
+        }
     }
 #endif
 
@@ -797,6 +908,23 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
             {
                 failedTransitionIndex = null;
                 await RestartAsync(transitionCancellation.Token);
+                return;
+            }
+
+            if (audioPlayer is not null && currentIndex >= 0 &&
+                string.Equals(tracks[currentIndex].Source, tracks[index].Source, StringComparison.OrdinalIgnoreCase))
+            {
+                ReleasePlayer(audioPlayer);
+                audioPlayer = null;
+                IsPlaying = false;
+                IsPaused = false;
+                await LoadTrackAsync(index, transitionCancellation.Token);
+                OnTransitionSucceeded();
+                audioPlayer?.Play();
+                IsPlaying = true;
+                IsPaused = false;
+                StartMonitor();
+                RaiseStateChanged();
                 return;
             }
 

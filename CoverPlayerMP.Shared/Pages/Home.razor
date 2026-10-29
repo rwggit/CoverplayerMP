@@ -248,12 +248,19 @@
         <section class="library-dialog" style="@SubDialogOpacityVars" @onclick:stopPropagation="true">
             <div class="control-dialog-header">
                 <span>@Text.AudioFiles (@FilteredLibrary.Count() @Text.Of @libraryTracks.Count)</span>
+                    @if (Player.LibraryTracksLoadedFromIndex)
+                    {
+                        <button class="close-button" title="@Text.RefreshAudioFiles" aria-label="@Text.RefreshAudioFiles" @onclick="RefreshLibraryAsync">
+                            &#x21bb;
+                        </button>
+                    }
                 <button class="close-button" title="@Text.Close" @onclick="CloseLibrary">×</button>
             </div>
             @if (libraryLoading)
             {
-                <div class="library-status">@Text.ReadingAudioFiles</div>
+                <div class="library-status">@Text.ReadingAudioFilesCount(Player.LibraryTracksFound)</div>
             }
+
             else
             {
                 <div class="library-table-wrapper">
@@ -417,7 +424,7 @@
                             @foreach (var (track, index) in FilteredPlaylist)
                             {
                                 var details = GetEditorDetails(track);
-                                <tr @key="track" class="@EditorRowClass(index)" @onclick="e => SelectRow(index, e)"
+                                 <tr @key="index" class="@EditorRowClass(index)" @onclick="e => SelectRow(index, e)"
                                     @onpointerdown="e => BeginLongPress(index, e)"
                                     @onpointermove="MoveLongPress"
                                     @onpointerup="CancelLongPress"
@@ -492,7 +499,7 @@
                         @foreach (var (track, index) in FilteredPlaylist)
                         {
                             var details = GetEditorDetails(track);
-                            <div @key="track" class="playlist-card @EditorRowClass(index)" @onclick="e => SelectRow(index, e)"
+                             <div @key="index" class="playlist-card @EditorRowClass(index)" @onclick="e => SelectRow(index, e)"
                                  @onpointerdown="e => BeginLongPress(index, e)"
                                  @onpointermove="MoveLongPress"
                                  @onpointerup="CancelLongPress"
@@ -2156,6 +2163,23 @@
         try
         {
             libraryTracks = (await Player.GetLibraryTracksAsync())
+                .OrderBy(t => t.Track.Artist, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(t => t.Track.Title, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+        }
+        finally
+        {
+            libraryLoading = false;
+        }
+    }
+
+    private async Task RefreshLibraryAsync()
+    {
+        libraryLoading = true;
+        StateHasChanged();
+        try
+        {
+            libraryTracks = (await Player.GetLibraryTracksAsync(refresh: true))
                 .OrderBy(t => t.Track.Artist, StringComparer.CurrentCultureIgnoreCase)
                 .ThenBy(t => t.Track.Title, StringComparer.CurrentCultureIgnoreCase)
                 .ToList();

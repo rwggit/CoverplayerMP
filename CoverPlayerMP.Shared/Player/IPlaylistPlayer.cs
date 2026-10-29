@@ -17,6 +17,8 @@ public interface IPlaylistPlayer : IAsyncDisposable
     bool IsPaused { get; }
     string? ErrorMessage { get; }
     bool NeedsMusicFolder => false;
+    int LibraryTracksFound => 0;
+    bool LibraryTracksLoadedFromIndex => false;
     Task SelectMusicFolderAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     Task SelectAudioFilesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     bool SupportsServerPlaylist => false;
@@ -38,7 +40,7 @@ public interface IPlaylistPlayer : IAsyncDisposable
     Task NextAsync(CancellationToken cancellationToken = default);
     Task PreviousAsync(CancellationToken cancellationToken = default);
     Task RestartAsync(CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<LibraryTrack>> GetLibraryTracksAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<LibraryTrack>> GetLibraryTracksAsync(CancellationToken cancellationToken = default, bool refresh = false);
     Task InsertTrackAsync(Track track, TrackInsertPosition position, CancellationToken cancellationToken = default);
     Task PlayWithCrossfadeAsync(int index, CancellationToken cancellationToken = default);
     void MoveTrack(int fromIndex, int toIndex);

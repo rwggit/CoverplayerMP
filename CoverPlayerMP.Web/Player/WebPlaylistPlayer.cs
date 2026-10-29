@@ -108,7 +108,7 @@ public sealed class WebPlaylistPlayer(IJSRuntime js, AppText text) : IPlaylistPl
 
     public Task RestartAsync(CancellationToken cancellationToken = default) => SeekAsync(0, cancellationToken);
 
-    public async Task<IReadOnlyList<LibraryTrack>> GetLibraryTracksAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<LibraryTrack>> GetLibraryTracksAsync(CancellationToken cancellationToken = default, bool refresh = false)
     {
         var files = await js.InvokeAsync<LibraryFile[]?>("coverPlayer.pickAudioLibrary", cancellationToken);
         return files?.Select(f => new LibraryTrack(

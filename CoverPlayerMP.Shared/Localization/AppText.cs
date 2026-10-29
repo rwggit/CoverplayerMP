@@ -73,6 +73,7 @@ public sealed class AppText
     public string OpenPlaylist => T("Playlist öffnen", "Open playlist", "Ouvrir la playlist");
     public string EditPlaylist => T("Playlist bearbeiten", "Edit playlist", "Modifier la playlist");
     public string SearchAudioFiles => T("Audiodateien suchen", "Search audio files", "Rechercher des fichiers audio");
+    public string RefreshAudioFiles => T("Audiodateien neu suchen und Index aktualisieren", "Search audio files again and update the index", "Rechercher les fichiers audio et actualiser l’index");
     public string Previous => T("Vorheriges", "Previous", "Précédent");
     public string Restart => T("Anfang", "Restart", "Début");
     public string Pause => "Pause";
@@ -84,6 +85,7 @@ public sealed class AppText
     // Mediathek
     public string AudioFiles => T("Audiodateien", "Audio files", "Fichiers audio");
     public string ReadingAudioFiles => T("Audiodateien werden gelesen …", "Reading audio files …", "Lecture des fichiers audio …");
+    public string ReadingAudioFilesCount(int count) => T($"Audiodateien werden gelesen … {count} gefunden", $"Reading audio files … {count} found", $"Lecture des fichiers audio … {count} trouvés");
     public string DurationFilterPlaceholder => T("z.B. >3:00", "e.g. >3:00", "p. ex. >3:00");
 
     // Playlist bearbeiten
