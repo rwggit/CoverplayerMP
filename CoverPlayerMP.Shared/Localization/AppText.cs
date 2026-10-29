@@ -88,6 +88,7 @@ public sealed class AppText
 
     // Playlist bearbeiten
     public string Search => T("Suchen …", "Search …", "Rechercher …");
+    public string PlaylistEditorMenu => T("Playlisteditor-Menü", "Playlist editor menu", "Menu de l’éditeur de playlist");
     public string RemoveTrack => T("Lied entfernen", "Remove track", "Supprimer le morceau");
     public string AddTrack => T("Lied hinzufügen", "Add track", "Ajouter un morceau");
     public string SelectAll => T("Alle auswählen", "Select all", "Tout sélectionner");

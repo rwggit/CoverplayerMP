@@ -41,7 +41,7 @@
     position: relative;
     grid-column: 2;
     width: .6rem;
-    cursor: col-resize;
+    cursor: ew-resize;
     background: transparent;
     touch-action: none;
 }
@@ -54,6 +54,7 @@
     width: 2px;
     transform: translateX(-50%);
     background: #51576d;
+    cursor: ew-resize;
 }
 .pane-resizer:hover::after,
 .player-shell-split-left .pane-resizer:active::after,
@@ -66,7 +67,7 @@
     position: absolute;
     inset: 0;
     z-index: 20;
-    cursor: col-resize;
+    cursor: ew-resize;
     touch-action: none;
 }
 
@@ -299,6 +300,7 @@
     right: 1rem;
     bottom: 4.25rem;
     left: 1rem;
+    z-index: 10;
     width: max-content;
     max-width: calc(100% - 2rem);
     margin-inline: auto;
@@ -569,6 +571,26 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .editor-toolbar { display: flex; gap: .5rem; align-items: center; margin-bottom: .5rem; }
 .editor-toolbar .editor-search { flex: 1; margin-bottom: 0; }
 .editor-toolbar-layout-buttons { margin-left: auto; padding-left: .5rem; border-left: 1px solid #373c50; }
+.editor-menu-container { position: relative; flex: 0 0 auto; }
+.editor-menu-button { min-width: 2.25rem; padding-inline: .5rem; font-size: 1.2rem; line-height: 1; }
+.editor-menu {
+    position: absolute;
+    z-index: 5;
+    top: calc(100% + .35rem);
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    min-width: 12rem;
+    padding: .3rem;
+    border: 1px solid #51576d;
+    border-radius: .5rem;
+    background: #252938;
+    box-shadow: 0 .75rem 2rem rgb(0 0 0 / 45%);
+}
+.editor-menu button { display: flex; width: 100%; gap: .6rem; align-items: center; padding: .55rem .7rem; border: 0; border-radius: .3rem; text-align: left; }
+.editor-menu button svg { flex: 0 0 auto; }
+.editor-menu-symbol { display: inline-grid; flex: 0 0 1em; place-items: center; font-size: 1.15em; font-weight: 600; line-height: 1; }
+.editor-menu button:hover:not(:disabled), .editor-menu button.active { background: #5b4acb; }
 .editor-table td.editor-position { width: 4rem; cursor: pointer; font-variant-numeric: tabular-nums; }
 .editor-table td.editor-position input {
     width: 3.5rem;
@@ -646,16 +668,25 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .playlist-card.selected-row { outline: 2px solid #8a7cff; outline-offset: -2px; }
 .playlist-card.drop-target { box-shadow: inset 0 3px 0 #8a7cff; }
 .playlist-list.align-right .playlist-card { align-items: flex-end; }
-.playlist-card-head {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: .25rem;
-    margin-bottom: .2rem;
-    font-variant-numeric: tabular-nums;
-}
-.playlist-list.align-right .playlist-card-head { justify-content: flex-start; }
 .playlist-card-cover-wrap { position: relative; width: 100%; }
+.playlist-card-select {
+    position: absolute;
+    top: .35rem;
+    left: 2rem;
+    z-index: 2;
+    width: 1.1rem;
+    height: 1.1rem;
+    accent-color: #8a7cff;
+}
+.playlist-card .editor-grip {
+    position: absolute;
+    top: .15rem;
+    right: .15rem;
+    z-index: 2;
+    padding: .2rem .3rem;
+    border-radius: .25rem;
+    background: rgb(0 0 0 / 65%);
+}
 .playlist-card-position {
     position: absolute;
     top: 0;
@@ -670,7 +701,6 @@ button:disabled { cursor: not-allowed; opacity: .45; }
     text-align: center;
     cursor: pointer;
 }
-.playlist-list.align-right .playlist-card-position { left: auto; right: 0; border-radius: 0 0 0 .35rem; }
 .playlist-card-position input {
     width: 2.6rem;
     padding: .15rem .25rem;

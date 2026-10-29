@@ -31,6 +31,7 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
 
     public event EventHandler? StateChanged;
     public IReadOnlyList<Track> Tracks => tracks;
+    public string? PlaylistPath => playlistPath;
     public Track? CurrentTrack => currentIndex >= 0 && currentIndex < tracks.Count ? tracks[currentIndex] : null;
     public int CurrentIndex => currentIndex;
     public double Position => audioPlayer?.CurrentPosition ?? 0;

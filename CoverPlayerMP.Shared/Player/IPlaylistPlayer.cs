@@ -5,6 +5,7 @@ public interface IPlaylistPlayer : IAsyncDisposable
     event EventHandler? StateChanged;
 
     IReadOnlyList<Track> Tracks { get; }
+    string? PlaylistPath => null;
     Track? CurrentTrack { get; }
     int CurrentIndex { get; }
     double Position { get; }

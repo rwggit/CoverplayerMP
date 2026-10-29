@@ -288,55 +288,105 @@
 
     @if (editorVisible && !libraryVisible)
     {
-        <section class="library-dialog @(playlistLayout == PlaylistLayout.Table ? null : "library-dialog-pane")" style="--editor-cover-size: @(EditorCoverSizeRem.ToString(System.Globalization.CultureInfo.InvariantCulture))rem; @SubDialogOpacityVars" @onclick:stopPropagation="true">
+        <section class="library-dialog @(playlistLayout == PlaylistLayout.Table ? null : "library-dialog-pane")" style="--editor-cover-size: @(EditorCoverSizeRem.ToString(System.Globalization.CultureInfo.InvariantCulture))rem; @SubDialogOpacityVars" @onclick="CloseEditorMenu" @onclick:stopPropagation="true">
             <div class="control-dialog-header">
-                <span>@Text.EditPlaylist (@FilteredPlaylist.Count() @Text.Of @Player.Tracks.Count)</span>
+                <span>@PlaylistEditorTitle (@FilteredPlaylist.Count() @Text.Of @Player.Tracks.Count)</span>
                 <button class="close-button" title="@Text.Close" @onclick="CloseEditor">×</button>
             </div>
             <div class="editor-toolbar">
                 <input class="editor-search" type="search" placeholder="@Text.Search"
                        @bind="editorSearch" @bind:event="oninput" />
-                <button @onclick="RemoveSelectedTrackAsync" disabled="@(!CanRemoveSelected)"
-                        title="@Text.RemoveTrack" aria-label="@Text.RemoveTrack">
-                    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor"
-                         aria-hidden="true" focusable="false" style="vertical-align: -0.125em;">
-                        <path d="M9 3h6l1 2h4v2H4V5h4z" />
-                        <path d="M6 9h12l-1 11.2a1 1 0 0 1-1 .8H8a1 1 0 0 1-1-.8z" />
-                    </svg>
-                </button>
-                <button @onclick="OpenLibraryAsync" title="@Text.AddTrack" aria-label="@Text.AddTrack">+</button>
-                <button @onclick="ShowSelectedTrackInfo" disabled="@(SelectedTrack is null)"
-                        title="@Text.TrackDetails" aria-label="@Text.TrackDetails">i</button>
-                <div class="layout-buttons editor-toolbar-layout-buttons">
-                    <button type="button" class="layout-button @(playlistLayout == PlaylistLayout.Table ? "active" : null)"
-                            title="@Text.PlaylistLayoutTable" aria-label="@Text.PlaylistLayoutTable"
-                            @onclick="() => SetPlaylistLayoutAsync(PlaylistLayout.Table)">
-                        <svg viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
-                            <rect x="3" y="4" width="18" height="16" rx="1.5" />
-                            <line x1="3" y1="9" x2="21" y2="9" />
-                            <line x1="3" y1="14" x2="21" y2="14" />
-                            <line x1="3" y1="19" x2="21" y2="19" />
+                @if (playlistLayout == PlaylistLayout.Table)
+                {
+                    <button @onclick="RemoveSelectedTrackAsync" disabled="@(!CanRemoveSelected)"
+                            title="@Text.RemoveTrack" aria-label="@Text.RemoveTrack">
+                        <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor"
+                             aria-hidden="true" focusable="false" style="vertical-align: -0.125em;">
+                            <path d="M9 3h6l1 2h4v2H4V5h4z" />
+                            <path d="M6 9h12l-1 11.2a1 1 0 0 1-1 .8H8a1 1 0 0 1-1-.8z" />
                         </svg>
                     </button>
-                    <button type="button" class="layout-button @(playlistLayout == PlaylistLayout.Left ? "active" : null)"
-                            title="@Text.PlaylistLayoutLeft" aria-label="@Text.PlaylistLayoutLeft"
-                            @onclick="() => SetPlaylistLayoutAsync(PlaylistLayout.Left)">
-                        <svg viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
-                            <rect x="3" y="4" width="7" height="16" rx="1.2" />
-                            <line x1="13" y1="8" x2="21" y2="8" />
-                            <line x1="13" y1="16" x2="18" y2="16" />
-                        </svg>
-                    </button>
-                    <button type="button" class="layout-button @(playlistLayout == PlaylistLayout.Right ? "active" : null)"
-                            title="@Text.PlaylistLayoutRight" aria-label="@Text.PlaylistLayoutRight"
-                            @onclick="() => SetPlaylistLayoutAsync(PlaylistLayout.Right)">
-                        <svg viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
-                            <rect x="14" y="4" width="7" height="16" rx="1.2" />
-                            <line x1="3" y1="8" x2="11" y2="8" />
-                            <line x1="6" y1="16" x2="11" y2="16" />
-                        </svg>
-                    </button>
-                </div>
+                    <button @onclick="OpenLibraryAsync" title="@Text.AddTrack" aria-label="@Text.AddTrack">+</button>
+                    <button @onclick="ShowSelectedTrackInfo" disabled="@(SelectedTrack is null)"
+                            title="@Text.TrackDetails" aria-label="@Text.TrackDetails">i</button>
+                    <div class="layout-buttons editor-toolbar-layout-buttons">
+                        <button type="button" class="layout-button active"
+                                title="@Text.PlaylistLayoutTable" aria-label="@Text.PlaylistLayoutTable"
+                                @onclick="() => SetPlaylistLayoutAsync(PlaylistLayout.Table)">
+                            <svg viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
+                                <rect x="3" y="4" width="18" height="16" rx="1.5" />
+                                <line x1="3" y1="9" x2="21" y2="9" />
+                                <line x1="3" y1="14" x2="21" y2="14" />
+                                <line x1="3" y1="19" x2="21" y2="19" />
+                            </svg>
+                        </button>
+                        <button type="button" class="layout-button"
+                                title="@Text.PlaylistLayoutLeft" aria-label="@Text.PlaylistLayoutLeft"
+                                @onclick="() => SetPlaylistLayoutAsync(PlaylistLayout.Left)">
+                            <svg viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
+                                <rect x="3" y="4" width="7" height="16" rx="1.2" />
+                                <line x1="13" y1="8" x2="21" y2="8" />
+                                <line x1="13" y1="16" x2="18" y2="16" />
+                            </svg>
+                        </button>
+                        <button type="button" class="layout-button"
+                                title="@Text.PlaylistLayoutRight" aria-label="@Text.PlaylistLayoutRight"
+                                @onclick="() => SetPlaylistLayoutAsync(PlaylistLayout.Right)">
+                            <svg viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
+                                <rect x="14" y="4" width="7" height="16" rx="1.2" />
+                                <line x1="3" y1="8" x2="11" y2="8" />
+                                <line x1="6" y1="16" x2="11" y2="16" />
+                            </svg>
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <div class="editor-menu-container" @onclick:stopPropagation="true">
+                        <button type="button" class="editor-menu-button" title="@Text.PlaylistEditorMenu"
+                                aria-label="@Text.PlaylistEditorMenu" aria-expanded="@editorMenuVisible"
+                                @onclick="ToggleEditorMenu">☰</button>
+                        @if (editorMenuVisible)
+                        {
+                            <div class="editor-menu" role="menu">
+                                <button role="menuitem" disabled="@(!CanRemoveSelected)" @onclick="RemoveSelectedTrackFromMenuAsync">
+                                    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true" focusable="false">
+                                        <path d="M9 3h6l1 2h4v2H4V5h4z" />
+                                        <path d="M6 9h12l-1 11.2a1 1 0 0 1-1 .8H8a1 1 0 0 1-1-.8z" />
+                                    </svg>
+                                    <span>@Text.RemoveTrack</span>
+                                </button>
+                                <button role="menuitem" @onclick="OpenLibraryFromMenuAsync"><span class="editor-menu-symbol">+</span><span>@Text.AddTrack</span></button>
+                                <button role="menuitem" disabled="@(SelectedTrack is null)" @onclick="ShowSelectedTrackInfoFromMenu"><span class="editor-menu-symbol">i</span><span>@Text.TrackDetails</span></button>
+                                <button role="menuitem" class="@(playlistLayout == PlaylistLayout.Table ? "active" : null)" @onclick="() => SetPlaylistLayoutFromMenuAsync(PlaylistLayout.Table)">
+                                    <svg viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
+                                        <rect x="3" y="4" width="18" height="16" rx="1.5" />
+                                        <line x1="3" y1="9" x2="21" y2="9" />
+                                        <line x1="3" y1="14" x2="21" y2="14" />
+                                        <line x1="3" y1="19" x2="21" y2="19" />
+                                    </svg>
+                                    <span>@Text.PlaylistLayoutTable</span>
+                                </button>
+                                <button role="menuitem" class="@(playlistLayout == PlaylistLayout.Left ? "active" : null)" @onclick="() => SetPlaylistLayoutFromMenuAsync(PlaylistLayout.Left)">
+                                    <svg viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
+                                        <rect x="3" y="4" width="7" height="16" rx="1.2" />
+                                        <line x1="13" y1="8" x2="21" y2="8" />
+                                        <line x1="13" y1="16" x2="18" y2="16" />
+                                    </svg>
+                                    <span>@Text.PlaylistLayoutLeft</span>
+                                </button>
+                                <button role="menuitem" class="@(playlistLayout == PlaylistLayout.Right ? "active" : null)" @onclick="() => SetPlaylistLayoutFromMenuAsync(PlaylistLayout.Right)">
+                                    <svg viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
+                                        <rect x="14" y="4" width="7" height="16" rx="1.2" />
+                                        <line x1="3" y1="8" x2="11" y2="8" />
+                                        <line x1="6" y1="16" x2="11" y2="16" />
+                                    </svg>
+                                    <span>@Text.PlaylistLayoutRight</span>
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
             </div>
             @if (selectionMode)
             {
@@ -452,20 +502,12 @@
                                  @ondragenter="() => dropIndex = index"
                                  @ondragover:preventDefault="true"
                                  @ondrop="() => DropTrack(index)">
-                                <div class="playlist-card-head">
+                                <div class="playlist-card-cover-wrap">
                                     @if (selectionMode)
                                     {
-                                        <input type="checkbox" checked="@selectedIndices.Contains(index)" tabindex="-1"
+                                        <input class="playlist-card-select" type="checkbox" checked="@selectedIndices.Contains(index)" tabindex="-1"
                                                aria-label="@Text.Select" style="pointer-events: none;" />
                                     }
-                                    <span class="editor-grip" draggable="@(editingIndex is null ? "true" : "false")"
-                                           title="@Text.Move" aria-label="@Text.Move"
-                                          @onpointerdown:stopPropagation="true"
-                                          @onclick:stopPropagation="true"
-                                          @ondragstart="() => BeginDrag(index)"
-                                          @ondragend="EndDrag">≡</span>
-                                </div>
-                                <div class="playlist-card-cover-wrap">
                                     <span class="playlist-card-position" @onclick="() => { if (!selectionMode) BeginEditPosition(index); }"
                                           @onclick:stopPropagation="true">
                                         @if (editingIndex == index)
@@ -480,6 +522,12 @@
                                             @(index + 1)
                                         }
                                     </span>
+                                    <span class="editor-grip" draggable="@(editingIndex is null ? "true" : "false")"
+                                          title="@Text.Move" aria-label="@Text.Move"
+                                          @onpointerdown:stopPropagation="true"
+                                          @onclick:stopPropagation="true"
+                                          @ondragstart="() => BeginDrag(index)"
+                                          @ondragend="EndDrag">≡</span>
                                     <button class="editor-cover playlist-card-cover" title="@Text.PlayTrack" aria-label="@Text.PlayTrack"
                                             draggable="@(editingIndex is null ? "true" : "false")"
                                             @onclick="() => PlayFromEditorAsync(index)" @onclick:stopPropagation="true"
@@ -939,6 +987,18 @@
     private enum PlaylistLayout { Table, Left, Right }
     private PlaylistLayout playlistLayout = PlaylistLayout.Table;
 
+    private string PlaylistEditorTitle => string.IsNullOrWhiteSpace(Player.PlaylistPath)
+        ? Text.EditPlaylist
+        : playlistLayout is PlaylistLayout.Left or PlaylistLayout.Right
+            ? GetPlaylistName(Player.PlaylistPath!)
+            : Player.PlaylistPath!;
+
+    private static string GetPlaylistName(string path)
+    {
+        var fileName = path.Replace('\\', '/').Split('/').Last();
+        return Path.GetFileNameWithoutExtension(fileName);
+    }
+
     // Bei Left/Right wird das Cover-Panel durch ein verstellbares Playlist-Panel geteilt,
     // statt die Playlist als Overlay über dem Cover anzuzeigen (nur solange der Editor offen ist).
     private bool PlaylistSplitActive => editorVisible && !libraryVisible && playlistLayout != PlaylistLayout.Table;
@@ -1009,6 +1069,36 @@
             return;
         playlistLayout = layout;
         await SaveSettingAsync(PlaylistLayoutKey, layout.ToString());
+    }
+
+    private bool editorMenuVisible;
+
+    private void ToggleEditorMenu() => editorMenuVisible = !editorMenuVisible;
+
+    private void CloseEditorMenu() => editorMenuVisible = false;
+
+    private async Task RemoveSelectedTrackFromMenuAsync()
+    {
+        editorMenuVisible = false;
+        await RemoveSelectedTrackAsync();
+    }
+
+    private async Task OpenLibraryFromMenuAsync()
+    {
+        editorMenuVisible = false;
+        await OpenLibraryAsync();
+    }
+
+    private void ShowSelectedTrackInfoFromMenu()
+    {
+        editorMenuVisible = false;
+        ShowSelectedTrackInfo();
+    }
+
+    private async Task SetPlaylistLayoutFromMenuAsync(PlaylistLayout layout)
+    {
+        editorMenuVisible = false;
+        await SetPlaylistLayoutAsync(layout);
     }
 
     private string? coverUri;
@@ -1541,6 +1631,13 @@
     {
         return InvokeAsync(() =>
         {
+            if (editorMenuVisible)
+            {
+                editorMenuVisible = false;
+                StateHasChanged();
+                return;
+            }
+
             if (!HandleBack() && controlsVisible)
             {
                 HideControls();
@@ -1756,6 +1853,7 @@
     private void CloseEditor()
     {
         editorVisible = false;
+        editorMenuVisible = false;
         editingIndex = null;
         ClearSelection();
     }
