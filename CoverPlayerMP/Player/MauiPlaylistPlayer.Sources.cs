@@ -20,6 +20,16 @@ public sealed partial class MauiPlaylistPlayer
         // Listet Unterordner und Playlists (.m3u/.m3u8) eines WebDAV-Ordners auf.
         public async Task<IReadOnlyList<ServerEntry>> ListServerFolderAsync(string folderUrl, string? user, string? password, bool trustCertificate = false, CancellationToken cancellationToken = default)
         {
+#if ANDROID
+            if (global::Android.OS.Build.VERSION.SdkInt >=
+                (global::Android.OS.BuildVersionCodes)36)
+            {
+                var permission = await Permissions.RequestAsync<CoverPlayerMP.Platforms.Android.LocalNetworkPermission>();
+                if (permission != PermissionStatus.Granted)
+                    throw new InvalidOperationException("Der Zugriff auf das lokale Netzwerk wurde nicht erlaubt.");
+            }
+#endif
+
             if (!Uri.TryCreate(folderUrl?.Trim(), UriKind.Absolute, out var parsed) ||
                 parsed.Scheme is not ("http" or "https"))
                 throw new InvalidOperationException(text.ErrorInvalidServerUrl);
@@ -87,7 +97,10 @@ public sealed partial class MauiPlaylistPlayer
         if (serverTrustCertificate && serverBase is not null &&
             string.Equals(url.Host, serverBase.Host, StringComparison.OrdinalIgnoreCase) && url.Port == serverBase.Port)
             handler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
-        var http = new HttpClient(handler);
+        var http = new HttpClient(handler)
+        {
+            Timeout = TimeSpan.FromSeconds(10)
+        };
         if (serverBase is not null && !string.IsNullOrEmpty(serverUser) &&
             string.Equals(url.Host, serverBase.Host, StringComparison.OrdinalIgnoreCase) &&
             url.Port == serverBase.Port)

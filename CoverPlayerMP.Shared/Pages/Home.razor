@@ -914,15 +914,18 @@
 
     private async Task ConnectServerAsync()
     {
-        await SaveSettingAsync(ServerUrlKey, serverUrl.Trim());
-        await SaveSettingAsync(ServerUserKey, serverUser.Trim());
-
         // Always reset browsing state before a new connection attempt so the dialog
         // visibly returns to loading/input mode and errors are shown in the same flow.
         serverEntries = null;
         serverFolder = string.Empty;
 
         await BrowseServerAsync(NormalizeServerUrl(serverUrl));
+
+        if (serverEntries is not null)
+        {
+            await SaveSettingAsync(ServerUrlKey, serverUrl.Trim());
+            await SaveSettingAsync(ServerUserKey, serverUser.Trim());
+        }
     }
 
     private static string NormalizeServerUrl(string value)
