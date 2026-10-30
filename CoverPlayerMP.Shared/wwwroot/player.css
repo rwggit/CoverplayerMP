@@ -145,6 +145,14 @@
     gap: .5rem;
     justify-content: center;
 }
+.player-error-header {
+    display: flex;
+    align-items: flex-start;
+    gap: .5rem;
+}
+.player-error-header > div {
+    flex: 1 1 auto;
+}
 .player-error {
     position: absolute;
     top: max(3.5rem, calc(env(safe-area-inset-top, 0px) + 1.5rem));

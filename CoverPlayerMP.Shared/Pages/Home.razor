@@ -24,10 +24,14 @@
             }
         </div>
     }
-    @if (!string.IsNullOrWhiteSpace(Player.ErrorMessage) || Player.NeedsMusicFolder)
+    @if (ShowPlayerError)
     {
         <div class="player-error" role="alert" @onclick:stopPropagation="true">
-            <div>@Player.ErrorMessage</div>
+            <div class="player-error-header">
+                <div>@Player.ErrorMessage</div>
+                <button class="close-button" title="@Text.Close" aria-label="@Text.Close"
+                        @onclick="DismissPlayerError" @onclick:stopPropagation="true">&times;</button>
+            </div>
             @if (Player.NeedsMusicFolder)
             {
                 <select class="missing-files" size="5" aria-label="@Text.MissingFilesLabel" title="@Text.MissingFilesLabel">
@@ -890,6 +894,17 @@
 
     private Task PickAudioFilesAsync() => Player.SelectAudioFilesAsync();
 
+    private bool playerErrorDismissed;
+    private string? lastPlayerErrorMessage;
+    private bool lastNeedsMusicFolder;
+    private int lastMissingFileCount;
+
+    private bool ShowPlayerError =>
+        !playerErrorDismissed &&
+        (!string.IsNullOrWhiteSpace(Player.ErrorMessage) || Player.NeedsMusicFolder);
+
+    private void DismissPlayerError() => playerErrorDismissed = true;
+
     private bool serverDialogVisible;
     private string serverUrl = string.Empty;
     private string serverUser = string.Empty;
@@ -1689,6 +1704,17 @@
     {
         if (disposed)
             return;
+
+        var currentErrorMessage = Player.ErrorMessage;
+        var currentNeedsMusicFolder = Player.NeedsMusicFolder;
+        var currentMissingFileCount = Player.MissingFiles.Count;
+        if (!string.Equals(lastPlayerErrorMessage, currentErrorMessage, StringComparison.Ordinal) ||
+            lastNeedsMusicFolder != currentNeedsMusicFolder ||
+            lastMissingFileCount != currentMissingFileCount)
+            playerErrorDismissed = false;
+        lastPlayerErrorMessage = currentErrorMessage;
+        lastNeedsMusicFolder = currentNeedsMusicFolder;
+        lastMissingFileCount = currentMissingFileCount;
 
         if (!isSeeking)
             displayPosition = Player.Position;
