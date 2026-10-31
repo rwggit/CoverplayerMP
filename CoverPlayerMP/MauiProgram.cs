@@ -19,7 +19,9 @@ public static class MauiProgram
         builder.Services.AddMauiBlazorWebView();
         builder.Services.AddSingleton<CoverPlayerMP.Shared.Localization.AppText>();
         builder.Services.AddSingleton<IPlaylistPlayer, MauiPlaylistPlayer>();
+        builder.Services.AddSingleton<HttpClient>();
         builder.Services.AddSingleton<CoverPlayerMP.Shared.Player.CoverSearch>();
+        builder.Services.AddSingleton<CoverPlayerMP.Shared.Player.YouTubeSearchService>();
 #if WINDOWS
         builder.Services.AddSingleton<IWindowControls, CoverPlayerMP.Platforms.Windows.WindowControls>();
 #endif

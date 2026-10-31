@@ -4,14 +4,14 @@
 @inject IJSRuntime Js
 @inject AppText Text
 @inject CoverSearch CoverSearcher
+@inject YouTubeSearchService YouTubeSearcher
 @inject IServiceProvider Services
 
 <PageTitle>CoverPlayerMP</PageTitle>
 
 <div class="player-shell @(PlaylistSplitActive ? (playlistLayout == PlaylistLayout.Left ? "player-shell-split-left" : "player-shell-split-right") : null)"
      style="@(PlaylistSplitActive ? $"--editor-pane-width: {editorPaneWidth.ToString(System.Globalization.CultureInfo.InvariantCulture)}px;" : null)"
-     @onclick="ShowControls">
-    <div class="bottom-hotspot" @onmouseenter="ShowControls"></div>
+     >
     @if (WindowControls is { } windowControls)
     {
         <div class="window-hotspot" @onmouseenter="UpdateWindowButtons">
@@ -94,14 +94,50 @@
             </section>
         </div>
     }
+    @if (youTubeChooserVisible)
+    {
+        <div class="insert-overlay" style="@SubDialogOpacityVars" @onclick="CloseYouTubeChooser" @onclick:stopPropagation="true">
+            <section class="insert-dialog youtube-chooser" @onclick:stopPropagation="true">
+                <div class="control-dialog-header">
+                    <span>@Text.YouTubeChooseVideo</span>
+                    <button class="close-button" title="@Text.Close" @onclick="CloseYouTubeChooser">×</button>
+                </div>
+                @foreach (var chooserVideo in youTubeResults)
+                {
+                    <button class="youtube-result" @onclick="() => SelectYouTubeVideo(chooserVideo)">
+                        <strong>@chooserVideo.Title</strong>
+                        @if (!string.IsNullOrWhiteSpace(chooserVideo.Channel))
+                        {
+                            <small>@chooserVideo.Channel</small>
+                        }
+                    </button>
+                }
+            </section>
+        </div>
+    }
     <div class="cover-stage @(PlaylistSplitActive ? "cover-stage-split" : null)"
          @onpointerdown="OnSwipeStart"
          @onpointerup="OnSwipeEndAsync"
          @onpointercancel="() => swipeStart = null">
-        <canvas class="cover-image" @ref="coverCanvas"></canvas>
-        @if (string.IsNullOrWhiteSpace(coverUri))
+        @if (selectedYouTubeVideo is { } video)
         {
-            <div class="cover-placeholder">♪</div>
+            <iframe class="youtube-player" @ref="youtubeFrame" src="@YouTubeEmbedUrl(video.VideoId)"
+                    title="@video.Title" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+            @if (youTubeEmbedFailed)
+            {
+                <div class="youtube-fallback">
+                    <span>@Text.YouTubeEmbedUnavailable</span>
+                    <button @onclick="OpenYouTubeExternallyAsync">@Text.YouTubeOpenExternally</button>
+                </div>
+            }
+        }
+        else
+        {
+            <canvas class="cover-image" @ref="coverCanvas"></canvas>
+            @if (string.IsNullOrWhiteSpace(coverUri))
+            {
+                <div class="cover-placeholder">♪</div>
+            }
         }
     </div>
     @if (PlaylistSplitActive)
@@ -115,11 +151,18 @@
              @onpointercancel="EndPaneResize" @onclick:stopPropagation="true"></div>
     }
     <div class="track-caption">
-        <span>@(Player.CurrentTrack?.Artist ?? "CoverPlayerMP")</span>
-        <span class="caption-separator">—</span>
-        <span>@(Player.CurrentTrack?.Title ?? Text.SelectPlaylist)</span>
+        <span class="track-caption-title" @onmouseenter="ShowControls">
+            <span>@(Player.CurrentTrack?.Artist ?? "CoverPlayerMP")</span>
+            <span class="caption-separator">—</span>
+            <span>@(Player.CurrentTrack?.Title ?? Text.SelectPlaylist)</span>
+        </span>
         @if (Player.CurrentTrack is not null)
         {
+            @if (youTubeAvailable)
+            {
+                <button class="youtube-button" title="@Text.YouTubeButton" aria-label="@Text.YouTubeButton"
+                        @onclick="OnYouTubeButtonClicked" @onclick:stopPropagation="true">YouTube</button>
+            }
             <button class="info-button" title="@Text.TrackDetails" aria-label="@Text.TrackDetails"
                     @onclick="ShowTrackInfo" @onclick:stopPropagation="true">i</button>
         }
@@ -615,6 +658,16 @@
                         <dt>@entry.Key</dt>
                         <dd>
                             @entry.Value
+                            @if (entry.Key == Text.Artist)
+                            {
+                                <button class="info-button info-inline" title="@Text.WikipediaArtist" aria-label="@Text.WikipediaArtist"
+                                        @onclick="() => OpenWikipediaAsync(entry.Value)">i</button>
+                            }
+                            @if (entry.Key == Text.Title)
+                            {
+                                <button class="info-button info-inline" title="@Text.WikipediaTitle" aria-label="@Text.WikipediaTitle"
+                                        @onclick="() => OpenWikipediaAsync(entry.Value)">i</button>
+                            }
                             @if (entry.Key == Text.MetaTagTypes)
                             {
                                 <button class="info-button info-inline" title="@Text.TagContents" aria-label="@Text.TagContents"
@@ -785,6 +838,23 @@
                             <option value="@AppLanguage.French">Français</option>
                         </select>
                     </label>
+                    <label class="setting-row">
+                        <span>@Text.YouTubeSearchMethod</span>
+                        <select value="@youTubeSearchMode" @onchange="OnYouTubeSearchModeChanged">
+                            <option value="@YouTubeSearchMode.DataApi">@Text.YouTubeDataApi</option>
+                            <option value="@YouTubeSearchMode.PublicSearch">@Text.YouTubePublicSearch</option>
+                            <option value="@YouTubeSearchMode.SearchPage">@Text.YouTubeSearchPage</option>
+                        </select>
+                        <small class="setting-hint">@Text.YouTubeSearchMethodHint</small>
+                    </label>
+                    @if (youTubeSearchMode == YouTubeSearchMode.DataApi)
+                    {
+                        <label class="setting-row">
+                            <span>@Text.YouTubeApiKey</span>
+                            <input type="password" value="@youTubeApiKey" @oninput="OnYouTubeApiKeyChanged" autocomplete="off" />
+                            <small class="setting-hint">@Text.YouTubeApiKeyHint</small>
+                        </label>
+                    }
                     <button @onclick="OpenAnimationsAsync">@Text.Animations</button>
                     @if (Player.SupportsRemotePlayback)
                     {
@@ -1129,6 +1199,17 @@
     private string? coverUri;
     private string? coverSource;
     private ElementReference coverCanvas;
+    private bool youTubeAvailable;
+    private bool youTubeSearching;
+    private bool youTubeChooserVisible;
+    private bool youTubeEmbedFailed;
+    private bool youTubeEmbedChanged;
+    private ElementReference youtubeFrame;
+    private DotNetObjectReference<Home>? youtubeReference;
+    private string? youTubeTrackKey;
+    private IReadOnlyList<YouTubeSearchResult> youTubeResults = [];
+    private YouTubeSearchResult? selectedYouTubeVideo;
+    private string? youTubeSearchUrl;
     private bool coverChanged;
     private double displayPosition;
     private double durationValue;
@@ -1141,6 +1222,7 @@
         Player.StateChanged += OnPlayerStateChanged;
         Text.LanguageChanged += OnLanguageChangedEvent;
         BackNavigation.Handler = HandleBack;
+        youtubeReference = DotNetObjectReference.Create(this);
     }
 
     private IReadOnlyList<KeyValuePair<string, string>>? trackInfo;
@@ -1164,6 +1246,16 @@
         : track.Source;
 
     private void CloseTrackInfo() => trackInfo = null;
+
+    private async Task OpenWikipediaAsync(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return;
+
+        var language = Text.Code;
+        var url = $"https://{language}.wikipedia.org/wiki/Special:Search?search={Uri.EscapeDataString(value)}";
+        await Js.InvokeVoidAsync("open", url, "_blank");
+    }
 
     private IReadOnlyList<KeyValuePair<string, string>>? rawTags;
 
@@ -1481,11 +1573,17 @@
     {
         try
         {
-            if (coverChanged && !disposed)
+            if (coverChanged && selectedYouTubeVideo is null && !disposed)
             {
                 coverChanged = false;
                 var duration = (int)Math.Round(Math.Max(0.6, coverFadeSeconds) * 1000);
                 await Js.InvokeVoidAsync("coverTransition.show", coverCanvas, coverUri, duration);
+            }
+
+            if (youTubeEmbedChanged && selectedYouTubeVideo is not null && youtubeReference is not null && !disposed)
+            {
+                youTubeEmbedChanged = false;
+                await Js.InvokeVoidAsync("coverPlayerYouTube.initialize", youtubeFrame, youtubeReference);
             }
 
             if (scrollToCurrentTrackPending && !disposed)
@@ -1498,6 +1596,9 @@
                 return;
 
             await LoadSettingsAsync();
+
+            youTubeTrackKey = null;
+            StartYouTubeSearchForCurrentTrack();
 
             keyboardReference = DotNetObjectReference.Create(this);
             await Js.InvokeVoidAsync("coverPlayerKeyboard.register", keyboardReference);
@@ -1525,6 +1626,10 @@
     private const string LanguageKey = "coverPlayer.language";
     private const string ServerUrlKey = "coverPlayer.serverUrl";
     private const string ServerUserKey = "coverPlayer.serverUser";
+    private const string YouTubeSearchModeKey = "coverPlayer.youTubeSearchMode";
+    private const string YouTubeApiKeyKey = "coverPlayer.youTubeApiKey";
+    private YouTubeSearchMode youTubeSearchMode = YouTubeSearchMode.PublicSearch;
+    private string youTubeApiKey = string.Empty;
 
     private async Task OnLanguageChanged(ChangeEventArgs args)
     {
@@ -1554,6 +1659,23 @@
             {
             }
         });
+    }
+
+    private async Task OnYouTubeSearchModeChanged(ChangeEventArgs args)
+    {
+        if (Enum.TryParse<YouTubeSearchMode>(args.Value?.ToString(), out var mode))
+        {
+            youTubeSearchMode = mode;
+            await SaveSettingAsync(YouTubeSearchModeKey, mode.ToString());
+            youTubeTrackKey = null;
+            StartYouTubeSearchForCurrentTrack();
+        }
+    }
+
+    private async Task OnYouTubeApiKeyChanged(ChangeEventArgs args)
+    {
+        youTubeApiKey = args.Value?.ToString() ?? string.Empty;
+        await SaveSettingAsync(YouTubeApiKeyKey, youTubeApiKey);
     }
 
     private async Task LoadSettingsAsync()
@@ -1595,6 +1717,10 @@
                 Text.Language = appLanguage;
             serverUrl = await Js.InvokeAsync<string?>("localStorage.getItem", ServerUrlKey) ?? serverUrl;
             serverUser = await Js.InvokeAsync<string?>("localStorage.getItem", ServerUserKey) ?? serverUser;
+            var youTubeMode = await Js.InvokeAsync<string?>("localStorage.getItem", YouTubeSearchModeKey);
+            if (Enum.TryParse<YouTubeSearchMode>(youTubeMode, out var parsedYouTubeMode))
+                youTubeSearchMode = parsedYouTubeMode;
+            youTubeApiKey = await Js.InvokeAsync<string?>("localStorage.getItem", YouTubeApiKeyKey) ?? youTubeApiKey;
 
             await Js.InvokeVoidAsync("document.documentElement.setAttribute", "lang", Text.Code);
 
@@ -1728,7 +1854,125 @@
             coverChanged = true;
         }
 
+        var currentTrack = Player.CurrentTrack;
+        var trackKey = currentTrack is null ? null : $"{currentTrack.Artist}\u001f{currentTrack.Title}\u001f{currentTrack.Source}";
+        if (!string.Equals(youTubeTrackKey, trackKey, StringComparison.Ordinal))
+        {
+            youTubeTrackKey = trackKey;
+            _ = SearchYouTubeAsync(currentTrack);
+        }
+
         _ = RenderSafeAsync();
+    }
+
+    private async Task SearchYouTubeAsync(Track? track)
+    {
+        youTubeAvailable = false;
+        youTubeResults = [];
+        selectedYouTubeVideo = null;
+        youTubeChooserVisible = false;
+        youTubeEmbedFailed = false;
+        youTubeEmbedChanged = false;
+        youTubeSearchUrl = track is null ? null : YouTubeSearchService.SearchUrl(track.Artist, track.Title);
+        if (track is null)
+            return;
+
+        youTubeSearching = true;
+        await RenderSafeAsync();
+        try
+        {
+            if (youTubeSearchMode == YouTubeSearchMode.SearchPage)
+            {
+                youTubeAvailable = true;
+                return;
+            }
+
+            youTubeResults = await YouTubeSearcher.SearchAsync(track.Artist, track.Title, youTubeSearchMode, youTubeApiKey);
+            youTubeAvailable = youTubeResults.Count > 0;
+            if (youTubeResults.Count == 1)
+            {
+                selectedYouTubeVideo = youTubeResults[0];
+                youTubeEmbedChanged = true;
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
+        {
+            youTubeResults = [];
+            youTubeAvailable = false;
+        }
+        finally
+        {
+            youTubeSearching = false;
+            await RenderSafeAsync();
+        }
+    }
+
+    private void StartYouTubeSearchForCurrentTrack()
+    {
+        var track = Player.CurrentTrack;
+        var trackKey = track is null ? null : $"{track.Artist}\u001f{track.Title}\u001f{track.Source}";
+        youTubeTrackKey = trackKey;
+        _ = SearchYouTubeAsync(track);
+    }
+
+    private async Task OnYouTubeButtonClicked()
+    {
+        await Player.PauseAsync();
+
+        if (youTubeSearchMode == YouTubeSearchMode.SearchPage)
+        {
+            if (youTubeSearchUrl is not null)
+                await Js.InvokeVoidAsync("open", youTubeSearchUrl, "_blank");
+            return;
+        }
+
+        if (youTubeResults.Count > 1)
+        {
+            selectedYouTubeVideo = null;
+            youTubeChooserVisible = true;
+            return;
+        }
+
+        if (youTubeResults.Count == 1)
+        {
+            selectedYouTubeVideo = youTubeResults[0];
+            youTubeEmbedChanged = true;
+        }
+    }
+
+    private async Task SelectYouTubeVideo(YouTubeSearchResult video)
+    {
+        await Player.PauseAsync();
+        selectedYouTubeVideo = video;
+        youTubeEmbedFailed = false;
+        youTubeEmbedChanged = true;
+        youTubeChooserVisible = false;
+    }
+
+    private void CloseYouTubeChooser() => youTubeChooserVisible = false;
+
+    private static string YouTubeEmbedUrl(string videoId) =>
+        $"https://www.youtube.com/embed/{Uri.EscapeDataString(videoId)}?autoplay=1&rel=0&enablejsapi=1";
+
+    [JSInvokable]
+    public Task HandleYouTubeError()
+    {
+        youTubeEmbedFailed = true;
+        return RenderSafeAsync();
+    }
+
+    [JSInvokable]
+    public async Task HandleYouTubeEnded()
+    {
+        selectedYouTubeVideo = null;
+        youTubeEmbedFailed = false;
+        await NextAsync();
+    }
+
+    private async Task OpenYouTubeExternallyAsync()
+    {
+        if (selectedYouTubeVideo is not null)
+            await Js.InvokeVoidAsync("open", selectedYouTubeVideo.Url, "_blank");
     }
 
     private async Task RenderSafeAsync()
@@ -2446,5 +2690,6 @@
             }
             keyboardReference.Dispose();
         }
+        youtubeReference?.Dispose();
     }
 }

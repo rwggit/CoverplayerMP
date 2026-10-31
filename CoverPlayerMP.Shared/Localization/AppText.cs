@@ -67,6 +67,8 @@ public sealed class AppText
     // Hauptansicht
     public string SelectPlaylist => T("Playlist auswählen", "Select playlist", "Choisir la playlist");
     public string TrackDetails => T("Details zum Lied", "Track details", "Détails du morceau");
+    public string WikipediaArtist => T("Wikipedia-Seite zum Interpreten öffnen", "Open the artist's Wikipedia page", "Ouvrir la page Wikipédia de l’artiste");
+    public string WikipediaTitle => T("Wikipedia-Seite zum Titel öffnen", "Open the title's Wikipedia page", "Ouvrir la page Wikipédia du titre");
     public string PlayerControls => T("Player-Steuerung", "Player controls", "Commandes du lecteur");
     public string Settings => T("Einstellungen", "Settings", "Paramètres");
     public string HideControls => T("Steuerung ausblenden", "Hide controls", "Masquer les commandes");
@@ -138,6 +140,20 @@ public sealed class AppText
     public string ErrorRemote(string message) => T($"Wiedergabe auf dem Gerät fehlgeschlagen: {message}", $"Playback on the device failed: {message}", $"Échec de la lecture sur l'appareil : {message}");
     public string RemoteThisDevice => T("Dieses Gerät", "This device", "Cet appareil");
     public string RemoteScreen => T("Bildschirm übertragen …", "Cast screen …", "Caster l'écran …");
+    public string YouTubeSearchMethod => T("YouTube-Suche", "YouTube search", "Recherche YouTube");
+    public string YouTubeDataApi => T("YouTube Data API v3 (API-Key)", "YouTube Data API v3 (API key)", "YouTube Data API v3 (clé API)");
+    public string YouTubePublicSearch => T("Öffentliche Suche ohne API-Key", "Public search without API key", "Recherche publique sans clé API");
+    public string YouTubeSearchPage => T("YouTube-Suchseite öffnen", "Open YouTube search page", "Ouvrir la page de recherche YouTube");
+    public string YouTubeSearchMethodHint => T("Die öffentliche Suche kann durch YouTube geändert oder blockiert werden. Die Suchseite liefert keine automatische Trefferliste.", "The public search can be changed or blocked by YouTube. The search page does not provide an automatic result list.", "La recherche publique peut être modifiée ou bloquée par YouTube. La page de recherche ne fournit pas de liste automatique.");
+    public string YouTubeApiKey => T("YouTube-API-Key", "YouTube API key", "Clé API YouTube");
+    public string YouTubeApiKeyHint => T("API-Key erstellen: Google Cloud Console öffnen, ein Projekt anlegen, unter „APIs und Dienste“ die YouTube Data API v3 aktivieren und unter „Anmeldedaten“ einen API-Schlüssel erstellen.", "To create an API key: open Google Cloud Console, create a project, enable YouTube Data API v3 under APIs & Services, then create an API key under Credentials.", "Pour créer une clé API : ouvrez Google Cloud Console, créez un projet, activez YouTube Data API v3 dans API et services, puis créez une clé dans Identifiants.");
+    public string YouTubeButton => T("YouTube-Video öffnen", "Open YouTube video", "Ouvrir la vidéo YouTube");
+    public string YouTubeOpenExternally => T("Auf YouTube öffnen", "Open on YouTube", "Ouvrir sur YouTube");
+    public string YouTubeEmbedUnavailable => T("Dieses Video kann nicht eingebettet werden.", "This video cannot be embedded.", "Cette vidéo ne peut pas être intégrée.");
+    public string YouTubeSearching => T("Suche nach YouTube-Videos …", "Searching for YouTube videos …", "Recherche de vidéos YouTube …");
+    public string YouTubeChooseVideo => T("YouTube-Video auswählen", "Choose a YouTube video", "Choisir une vidéo YouTube");
+    public string YouTubeNoVideos => T("Kein passendes YouTube-Video gefunden.", "No matching YouTube video found.", "Aucune vidéo YouTube correspondante trouvée.");
+    public string YouTubeSearchFailed => T("Die YouTube-Suche ist fehlgeschlagen.", "The YouTube search failed.", "La recherche YouTube a échoué.");
     public string QuitApp => T("CoverplayerMP beenden", "Quit CoverPlayerMP", "Quitter CoverPlayerMP");
     public string SavePlaylist => T("Playlist speichern", "Save playlist", "Enregistrer la playlist");
     public string SaveBeforeQuit => T("Die Playlist wurde verändert. Soll sie vor dem Beenden gespeichert werden?",

@@ -10,6 +10,8 @@ builder.Services.AddRazorComponents()
 builder.Services.AddScoped<CoverPlayerMP.Shared.Localization.AppText>();
 builder.Services.AddScoped<IPlaylistPlayer, WebPlaylistPlayer>();
 builder.Services.AddScoped<CoverPlayerMP.Shared.Player.CoverSearch>();
+builder.Services.AddScoped<HttpClient>();
+builder.Services.AddScoped<CoverPlayerMP.Shared.Player.YouTubeSearchService>();
 
 var app = builder.Build();
 
