@@ -8,6 +8,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CoverPlayerMP.Shared\CoverPlayerMP.Shared.csproj" />
+    <PackageReference Include="FFmpeg.AutoGen.Abstractions" Version="9.0.1.1" />
+    <PackageReference Include="FFmpeg.AutoGen.Bindings.DynamicallyLoaded" Version="9.0.1.1" />
+    <PackageReference Include="Openur.ChromaprintStatic" Version="1.6.2.10" />
+    <PackageReference Include="DevEnvy.FFmpeg.Binaries.LGPLv2.Runtime.win-x64" Version="9.0.2.1100" Condition="$([MSBuild]::IsOSPlatform('windows'))" />
+    <PackageReference Include="DevEnvy.FFmpeg.Binaries.LGPLv2.Runtime.linux-x64" Version="9.0.2.1100" Condition="$([MSBuild]::IsOSPlatform('linux'))" />
+    <PackageReference Include="DevEnvy.FFmpeg.Binaries.LGPLv2.Runtime.osx-x64" Version="9.0.2.1100" Condition="$([MSBuild]::IsOSPlatform('osx'))" />
   </ItemGroup>
 
 </Project>

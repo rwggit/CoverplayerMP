@@ -12,6 +12,8 @@ builder.Services.AddScoped<IPlaylistPlayer, WebPlaylistPlayer>();
 builder.Services.AddScoped<CoverPlayerMP.Shared.Player.CoverSearch>();
 builder.Services.AddScoped<HttpClient>();
 builder.Services.AddScoped<CoverPlayerMP.Shared.Player.YouTubeSearchService>();
+builder.Services.AddScoped<CoverPlayerMP.Shared.Player.MusicBrainzService>();
+builder.Services.AddScoped<IAudioFingerprintProvider, FpcalcFingerprintProvider>();
 
 var app = builder.Build();
 

@@ -115,6 +115,15 @@ public sealed class AppText
     // Details
     public string TagContents => T("Inhalt der Tags", "Tag contents", "Contenu des balises");
     public string ShowCoverPictures => T("Cover-Bilder anzeigen", "Show cover pictures", "Afficher les pochettes");
+    public string MusicBrainzMetadata => T("Metadaten von MusicBrainz", "Metadata from MusicBrainz", "Métadonnées de MusicBrainz");
+    public string MusicBrainzSearching => T("MusicBrainz wird abgefragt …", "Querying MusicBrainz …", "Interrogation de MusicBrainz …");
+    public string MusicBrainzNoMatch => T("Keine passenden MusicBrainz-Metadaten gefunden.", "No matching MusicBrainz metadata found.", "Aucune métadonnée MusicBrainz correspondante trouvée.");
+    public string MusicBrainzError => T("MusicBrainz konnte nicht abgefragt werden.", "MusicBrainz could not be queried.", "Impossible d’interroger MusicBrainz.");
+    public string CurrentValue => T("Aktueller Wert", "Current value", "Valeur actuelle");
+    public string MusicBrainzValue => T("MusicBrainz-Wert", "MusicBrainz value", "Valeur MusicBrainz");
+    public string TakeOver => T("Übernehmen", "Apply", "Appliquer");
+    public string TakeOverSelected => T("Ausgewählte Werte übernehmen", "Apply selected values", "Appliquer les valeurs sélectionnées");
+    public string NoChanges => T("Keine Werte ausgewählt.", "No values selected.", "Aucune valeur sélectionnée.");
     public string NoTags => T("Keine Tags vorhanden.", "No tags available.", "Aucune balise disponible.");
     public string CoverPictures => T("Cover-Bilder", "Cover pictures", "Pochettes");
     public string NoCoverPictures => T("Keine Cover-Bilder vorhanden.", "No cover pictures available.", "Aucune pochette disponible.");
@@ -272,4 +281,10 @@ public sealed class AppText
     public string ErrorCannotPlay(string name, string message) => T($"„{name}“ kann nicht abgespielt werden: {message}", $"“{name}” cannot be played: {message}", $"« {name} » ne peut pas être lu : {message}");
     public string ErrorTransition(string message) => T($"Übergang konnte nicht ausgeführt werden: {message}", $"Transition failed: {message}", $"Échec de la transition : {message}");
     public string ErrorMonitor(string message) => T($"Playerüberwachung fehlgeschlagen: {message}", $"Player monitoring failed: {message}", $"Échec de la surveillance du lecteur : {message}");
+    public string AcoustIdApiKey => T("AcoustID-API-Key", "AcoustID API key", "Clé API AcoustID");
+    public string AcoustIdApiKeyHint => T("Für die Fingerabdrucksuche fpcalc installieren und einen API-Key bei AcoustID beantragen: ", "For fingerprint search, install fpcalc and request an API key from AcoustID: ", "Pour la recherche par empreinte, installez fpcalc et demandez une clé API AcoustID : ");
+    public string AcoustIdFingerprint => T("MusicBrainz über Fingerprint suchen", "Search MusicBrainz by fingerprint", "Rechercher MusicBrainz par empreinte");
+    public string AcoustIdSearching => T("Audio-Fingerprint wird erzeugt und AcoustID wird abgefragt …", "Creating audio fingerprint and querying AcoustID …", "Création de l’empreinte audio et interrogation d’AcoustID …");
+    public string AcoustIdNoMatch => T("Kein passender AcoustID-/MusicBrainz-Treffer gefunden.", "No matching AcoustID/MusicBrainz result found.", "Aucun résultat AcoustID/MusicBrainz correspondant trouvé.");
+    public string AcoustIdError => T("Die Fingerprint-Suche ist fehlgeschlagen. Ist fpcalc installiert und der API-Key gültig?", "Fingerprint search failed. Is fpcalc installed and the API key valid?", "La recherche par empreinte a échoué. fpcalc est-il installé et la clé API valide ?");
 }

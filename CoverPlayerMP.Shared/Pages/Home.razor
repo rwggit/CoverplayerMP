@@ -5,6 +5,7 @@
 @inject AppText Text
 @inject CoverSearch CoverSearcher
 @inject YouTubeSearchService YouTubeSearcher
+@inject MusicBrainzService MusicBrainzSearcher
 @inject IServiceProvider Services
 
 <PageTitle>CoverPlayerMP</PageTitle>
@@ -691,19 +692,70 @@
             <section class="info-dialog" @onclick:stopPropagation="true">
                 <div class="control-dialog-header">
                     <span>@Text.TagContents</span>
+                    <button class="tag-action-button" @onclick="LoadMusicBrainzAsync">@Text.MusicBrainzMetadata</button>
+                    <button class="tag-action-button" @onclick="LoadAcoustIdAsync">@Text.AcoustIdFingerprint</button>
                     <button class="close-button" title="@Text.Close" @onclick="CloseRawTags">×</button>
                 </div>
-                <dl class="info-list">
-                    @if (rawTags.Count == 0)
+                @if (musicBrainzBusy)
+                {
+                    <span class="setting-hint">@musicBrainzStatus</span>
+                }
+                else if (musicBrainzError is not null)
+                {
+                    <span class="server-error">@musicBrainzError</span>
+                }
+                else if (musicBrainzMetadata is not null)
+                {
+                    <div class="metadata-comparison">
+                        <div class="metadata-comparison-header">
+                            <span></span>
+                            <strong>@Text.CurrentValue</strong>
+                            <strong>@Text.MusicBrainzValue</strong>
+                        </div>
+                        @if (musicBrainzCoverDataUri is not null)
+                        {
+                            <div class="metadata-comparison-row metadata-cover-row">
+                                <input type="checkbox" checked="@musicBrainzCoverSelected"
+                                       @onchange="e => musicBrainzCoverSelected = e.Value is true" />
+                                <strong>@Text.Cover</strong>
+                                @if (currentCoverDataUri is not null)
+                                {
+                                    <img class="metadata-cover-image" src="@currentCoverDataUri" alt="@Text.Cover" />
+                                }
+                                else
+                                {
+                                    <span>—</span>
+                                }
+                                <img class="metadata-cover-image" src="@musicBrainzCoverDataUri" alt="@Text.Cover" />
+                            </div>
+                        }
+                        @foreach (var field in musicBrainzMetadata.Values.Keys)
+                        {
+                            <label class="metadata-comparison-row">
+                                <input type="checkbox" checked="@selectedMusicBrainzFields.Contains(field)"
+                                       @onchange="e => ToggleMusicBrainzField(field, e.Value is true)" />
+                                <strong>@MetadataFieldLabel(field)</strong>
+                                <span>@(editableMetadata.TryGetValue(field, out var current) ? current : "—")</span>
+                                <span>@musicBrainzMetadata.Values[field]</span>
+                            </label>
+                        }
+                        <button class="play-button" @onclick="ApplyMusicBrainzAsync">@Text.TakeOverSelected</button>
+                    </div>
+                }
+                else
+                {
+                    <dl class="info-list">
+                        @if (rawTags.Count == 0)
+                        {
+                            <dd>@Text.NoTags</dd>
+                        }
+                        @foreach (var entry in rawTags)
                     {
-                        <dd>@Text.NoTags</dd>
+                            <dt>@entry.Key</dt>
+                            <dd>@entry.Value</dd>
                     }
-                    @foreach (var entry in rawTags)
-                    {
-                        <dt>@entry.Key</dt>
-                        <dd>@entry.Value</dd>
-                    }
-                </dl>
+                    </dl>
+                }
             </section>
         </div>
     }
@@ -846,6 +898,11 @@
                             <option value="@YouTubeSearchMode.SearchPage">@Text.YouTubeSearchPage</option>
                         </select>
                         <small class="setting-hint">@Text.YouTubeSearchMethodHint</small>
+                    </label>
+                    <label class="setting-row">
+                        <span>@Text.AcoustIdApiKey</span>
+                        <input type="password" value="@acoustIdApiKey" @oninput="OnAcoustIdApiKeyChanged" autocomplete="off" />
+                        <small class="setting-hint">@Text.AcoustIdApiKeyHint<a href="https://acoustid.org/new-application" target="_blank" rel="noopener noreferrer">acoustid.org/new-application</a></small>
                     </label>
                     @if (youTubeSearchMode == YouTubeSearchMode.DataApi)
                     {
@@ -1258,14 +1315,218 @@
     }
 
     private IReadOnlyList<KeyValuePair<string, string>>? rawTags;
+    private MusicBrainzMetadata? musicBrainzMetadata;
+    private IReadOnlyDictionary<MetadataField, string> editableMetadata = new Dictionary<MetadataField, string>();
+    private readonly HashSet<MetadataField> selectedMusicBrainzFields = [];
+    private bool musicBrainzBusy;
+    private string musicBrainzStatus = string.Empty;
+    private string? musicBrainzError;
+    private string? currentCoverDataUri;
+    private byte[]? currentCoverBytes;
+    private string? musicBrainzCoverDataUri;
+    private byte[]? musicBrainzCoverBytes;
+    private bool musicBrainzCoverSelected;
 
     private void ShowRawTags()
     {
         HideControlsForSubDialog();
+        musicBrainzMetadata = null;
+        musicBrainzError = null;
+        currentCoverDataUri = null;
+        currentCoverBytes = null;
+        musicBrainzCoverDataUri = null;
+        musicBrainzCoverBytes = null;
+        musicBrainzCoverSelected = false;
         rawTags = TrackMetadata.ReadRawTags(infoSource, Text);
     }
 
-    private void CloseRawTags() => rawTags = null;
+    private void CloseRawTags()
+    {
+        musicBrainzMetadata = null;
+        musicBrainzError = null;
+        rawTags = null;
+    }
+
+    private async Task LoadMusicBrainzAsync()
+    {
+        if (Player.CurrentTrack is not { } track || string.IsNullOrWhiteSpace(infoSource))
+            return;
+
+        musicBrainzBusy = true;
+        musicBrainzError = null;
+        musicBrainzMetadata = null;
+        musicBrainzCoverDataUri = null;
+        musicBrainzCoverBytes = null;
+        musicBrainzCoverSelected = false;
+        selectedMusicBrainzFields.Clear();
+        await InvokeAsync(StateHasChanged);
+        try
+        {
+            musicBrainzMetadata = await MusicBrainzSearcher.FindAsync(track.Artist, track.Title);
+            if (musicBrainzMetadata is null)
+            {
+                musicBrainzError = Text.MusicBrainzNoMatch;
+                return;
+            }
+
+            editableMetadata = TrackMetadata.ReadEditableValues(infoSource);
+            currentCoverDataUri = CoverImage.ToDataUri(infoSource);
+            currentCoverBytes = TrackMetadata.ReadFirstPictureBytes(infoSource);
+            if (musicBrainzMetadata.CoverUrl is not null)
+            {
+                musicBrainzCoverBytes = await MusicBrainzSearcher.DownloadCoverAsync(musicBrainzMetadata.CoverUrl);
+                if (musicBrainzCoverBytes is { Length: > 0 })
+                {
+                    musicBrainzCoverDataUri = $"data:image/jpeg;base64,{Convert.ToBase64String(musicBrainzCoverBytes)}";
+                    musicBrainzCoverSelected = currentCoverBytes is null || !currentCoverBytes.AsSpan().SequenceEqual(musicBrainzCoverBytes);
+                }
+            }
+            foreach (var field in musicBrainzMetadata.Values.Keys)
+            {
+                if (!editableMetadata.TryGetValue(field, out var currentValue) ||
+                    !string.Equals(currentValue, musicBrainzMetadata.Values[field], StringComparison.Ordinal))
+                    selectedMusicBrainzFields.Add(field);
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
+        {
+            musicBrainzError = Text.MusicBrainzError;
+        }
+        finally
+        {
+            musicBrainzBusy = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task LoadAcoustIdAsync()
+    {
+        if (Player.CurrentTrack is not { } track || string.IsNullOrWhiteSpace(infoSource))
+            return;
+
+        musicBrainzBusy = true;
+        musicBrainzStatus = Text.AcoustIdSearching;
+        musicBrainzError = null;
+        musicBrainzMetadata = null;
+        musicBrainzCoverDataUri = null;
+        musicBrainzCoverBytes = null;
+        musicBrainzCoverSelected = false;
+        selectedMusicBrainzFields.Clear();
+        await InvokeAsync(StateHasChanged);
+        try
+        {
+            var fingerprint = await MusicBrainzSearcher.CreateFingerprintAsync(infoSource);
+            var match = (await MusicBrainzSearcher.FindAcoustIdMatchesAsync(fingerprint, acoustIdApiKey)).FirstOrDefault();
+            musicBrainzMetadata = match is null
+                ? null
+                : await MusicBrainzSearcher.FindByRecordingIdAsync(match.RecordingId);
+            if (musicBrainzMetadata is null)
+            {
+                musicBrainzError = Text.AcoustIdNoMatch;
+                return;
+            }
+
+            editableMetadata = TrackMetadata.ReadEditableValues(infoSource);
+            currentCoverDataUri = CoverImage.ToDataUri(infoSource);
+            currentCoverBytes = TrackMetadata.ReadFirstPictureBytes(infoSource);
+            if (musicBrainzMetadata.CoverUrl is not null)
+            {
+                musicBrainzCoverBytes = await MusicBrainzSearcher.DownloadCoverAsync(musicBrainzMetadata.CoverUrl);
+                if (musicBrainzCoverBytes is { Length: > 0 })
+                {
+                    musicBrainzCoverDataUri = $"data:image/jpeg;base64,{Convert.ToBase64String(musicBrainzCoverBytes)}";
+                    musicBrainzCoverSelected = currentCoverBytes is null || !currentCoverBytes.AsSpan().SequenceEqual(musicBrainzCoverBytes);
+                }
+            }
+            foreach (var field in musicBrainzMetadata.Values.Keys)
+            {
+                if (!editableMetadata.TryGetValue(field, out var currentValue) ||
+                    !string.Equals(currentValue, musicBrainzMetadata.Values[field], StringComparison.Ordinal))
+                    selectedMusicBrainzFields.Add(field);
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException or FileNotFoundException)
+        {
+            musicBrainzError = Text.AcoustIdError;
+        }
+        finally
+        {
+            musicBrainzBusy = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void ToggleMusicBrainzField(MetadataField field, bool selected)
+    {
+        if (selected)
+            selectedMusicBrainzFields.Add(field);
+        else
+            selectedMusicBrainzFields.Remove(field);
+    }
+
+    private async Task ApplyMusicBrainzAsync()
+    {
+        if (musicBrainzMetadata is null || string.IsNullOrWhiteSpace(infoSource))
+            return;
+
+        var values = musicBrainzMetadata.Values
+            .Where(pair => selectedMusicBrainzFields.Contains(pair.Key))
+            .ToDictionary(pair => pair.Key, pair => pair.Value);
+        if (values.Count == 0 && !musicBrainzCoverSelected)
+        {
+            musicBrainzError = Text.NoChanges;
+            return;
+        }
+
+        try
+        {
+            TrackMetadata.WriteEditableValues(infoSource, values);
+            if (musicBrainzCoverSelected && musicBrainzCoverBytes is { Length: > 0 } && Player.CurrentTrack is { } track)
+            {
+                var localFile = LocalMetadataSource(track);
+                if (localFile is not null && File.Exists(localFile))
+                {
+                    Task WriteCover()
+                    {
+                        CoverSearch.Apply(localFile, musicBrainzCoverBytes);
+                        return Task.CompletedTask;
+                    }
+
+                    if (Player is ICoverFileAccess access)
+                        await access.RunWithReleasedFileAsync(track.Source, WriteCover);
+                    else
+                        await WriteCover();
+                    coverUri = CoverImage.ToDataUri(localFile);
+                    coverChanged = true;
+                }
+            }
+            editableMetadata = TrackMetadata.ReadEditableValues(infoSource);
+            rawTags = TrackMetadata.ReadRawTags(infoSource, Text);
+            musicBrainzMetadata = null;
+            musicBrainzCoverDataUri = null;
+            musicBrainzCoverBytes = null;
+            musicBrainzCoverSelected = false;
+            musicBrainzError = null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or TagLib.CorruptFileException or InvalidOperationException)
+        {
+            musicBrainzError = ex.Message;
+        }
+    }
+
+    private string MetadataFieldLabel(MetadataField field) => field switch
+    {
+        MetadataField.Title => Text.Title,
+        MetadataField.Artist => Text.Artist,
+        MetadataField.AlbumArtist => Text.MetaAlbumArtist,
+        MetadataField.Album => Text.MetaAlbum,
+        MetadataField.Year => Text.MetaYear,
+        MetadataField.TrackNumber => Text.MetaTrackNumber,
+        MetadataField.DiscNumber => Text.MetaDisc,
+        MetadataField.Genre => Text.MetaGenre,
+        MetadataField.Composer => Text.MetaComposer,
+        _ => field.ToString()
+    };
 
     private IReadOnlyList<KeyValuePair<string, string>>? pictures;
 
@@ -1628,8 +1889,10 @@
     private const string ServerUserKey = "coverPlayer.serverUser";
     private const string YouTubeSearchModeKey = "coverPlayer.youTubeSearchMode";
     private const string YouTubeApiKeyKey = "coverPlayer.youTubeApiKey";
+    private const string AcoustIdApiKeyKey = "coverPlayer.acoustIdApiKey";
     private YouTubeSearchMode youTubeSearchMode = YouTubeSearchMode.PublicSearch;
     private string youTubeApiKey = string.Empty;
+    private string acoustIdApiKey = string.Empty;
 
     private async Task OnLanguageChanged(ChangeEventArgs args)
     {
@@ -1678,6 +1941,12 @@
         await SaveSettingAsync(YouTubeApiKeyKey, youTubeApiKey);
     }
 
+    private async Task OnAcoustIdApiKeyChanged(ChangeEventArgs args)
+    {
+        acoustIdApiKey = args.Value?.ToString() ?? string.Empty;
+        await SaveSettingAsync(AcoustIdApiKeyKey, acoustIdApiKey);
+    }
+
     private async Task LoadSettingsAsync()
     {
         try
@@ -1721,6 +1990,7 @@
             if (Enum.TryParse<YouTubeSearchMode>(youTubeMode, out var parsedYouTubeMode))
                 youTubeSearchMode = parsedYouTubeMode;
             youTubeApiKey = await Js.InvokeAsync<string?>("localStorage.getItem", YouTubeApiKeyKey) ?? youTubeApiKey;
+            acoustIdApiKey = await Js.InvokeAsync<string?>("localStorage.getItem", AcoustIdApiKeyKey) ?? acoustIdApiKey;
 
             await Js.InvokeVoidAsync("document.documentElement.setAttribute", "lang", Text.Code);
 

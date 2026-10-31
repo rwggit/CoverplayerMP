@@ -73,6 +73,13 @@
     <PackageReference Include="Plugin.Maui.Audio" Version="4.0.0" />
     <PackageReference Include="Sharpcaster" Version="3.0.0" />
     <PackageReference Include="SkiaSharp.Views.Maui.Controls" Version="3.119.1" />
+    <PackageReference Include="FFmpeg.AutoGen.Abstractions" Version="9.0.1.1" />
+    <PackageReference Include="FFmpeg.AutoGen.Bindings.DynamicallyLoaded" Version="9.0.1.1" />
+    <PackageReference Include="Openur.ChromaprintStatic" Version="1.6.2.10" />
+    <PackageReference Include="DevEnvy.FFmpeg.Binaries.LGPLv2.Runtime.android-arm64" Version="9.0.2.1100" Condition="'$(TargetFramework)' == 'net10.0-android'" />
+    <PackageReference Include="DevEnvy.FFmpeg.Binaries.LGPLv2.Runtime.ios-arm64" Version="9.0.2.1100" Condition="'$(TargetFramework)' == 'net10.0-ios'" />
+    <PackageReference Include="DevEnvy.FFmpeg.Binaries.LGPLv2.Runtime.maccatalyst-arm64" Version="9.0.2.1100" Condition="'$(TargetFramework)' == 'net10.0-maccatalyst'" />
+    <PackageReference Include="DevEnvy.FFmpeg.Binaries.LGPLv2.Runtime.win-x64" Version="9.0.2.1100" Condition="'$(TargetFramework)' == 'net10.0-windows10.0.19041.0'" />
   </ItemGroup>
 
   <ItemGroup>

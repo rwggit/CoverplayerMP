@@ -22,6 +22,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<HttpClient>();
         builder.Services.AddSingleton<CoverPlayerMP.Shared.Player.CoverSearch>();
         builder.Services.AddSingleton<CoverPlayerMP.Shared.Player.YouTubeSearchService>();
+        builder.Services.AddSingleton<CoverPlayerMP.Shared.Player.MusicBrainzService>();
+        builder.Services.AddSingleton<IAudioFingerprintProvider, FpcalcFingerprintProvider>();
 #if WINDOWS
         builder.Services.AddSingleton<IWindowControls, CoverPlayerMP.Platforms.Windows.WindowControls>();
 #endif

@@ -4,6 +4,93 @@ namespace CoverPlayerMP.Shared.Player;
 
 public static class TrackMetadata
 {
+    public static IReadOnlyDictionary<MetadataField, string> ReadEditableValues(string? path)
+    {
+        var result = new Dictionary<MetadataField, string>();
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            return result;
+
+        using var file = TagLib.File.Create(path);
+        var tag = file.Tag;
+        Add(result, MetadataField.Title, tag.Title);
+        Add(result, MetadataField.Artist, string.Join("; ", tag.Performers));
+        Add(result, MetadataField.AlbumArtist, string.Join("; ", tag.AlbumArtists));
+        Add(result, MetadataField.Album, tag.Album);
+        Add(result, MetadataField.Year, tag.Year == 0 ? null : tag.Year.ToString());
+        Add(result, MetadataField.TrackNumber, tag.Track == 0 ? null : tag.TrackCount == 0 ? tag.Track.ToString() : $"{tag.Track}/{tag.TrackCount}");
+        Add(result, MetadataField.DiscNumber, tag.Disc == 0 ? null : tag.DiscCount == 0 ? tag.Disc.ToString() : $"{tag.Disc}/{tag.DiscCount}");
+        Add(result, MetadataField.Genre, string.Join("; ", tag.Genres));
+        Add(result, MetadataField.Composer, string.Join("; ", tag.Composers));
+        return result;
+    }
+
+    public static byte[]? ReadFirstPictureBytes(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return null;
+
+        try
+        {
+            using var file = TagLib.File.Create(path);
+            return file.Tag.Pictures.FirstOrDefault()?.Data?.Data;
+        }
+        catch (Exception) when (File.Exists(path))
+        {
+            return null;
+        }
+    }
+
+    public static void WriteEditableValues(string path, IReadOnlyDictionary<MetadataField, string> values)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            throw new FileNotFoundException("Die Audiodatei wurde nicht gefunden.", path);
+
+        using var file = TagLib.File.Create(path);
+        var tag = file.Tag;
+        foreach (var (field, value) in values)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                continue;
+
+            var trimmed = value.Trim();
+            switch (field)
+            {
+                case MetadataField.Title: tag.Title = trimmed; break;
+                case MetadataField.Artist: tag.Performers = SplitValues(trimmed); break;
+                case MetadataField.AlbumArtist: tag.AlbumArtists = SplitValues(trimmed); break;
+                case MetadataField.Album: tag.Album = trimmed; break;
+                case MetadataField.Year when uint.TryParse(trimmed, out var year): tag.Year = year; break;
+                case MetadataField.TrackNumber: SetTrackNumber(tag, trimmed); break;
+                case MetadataField.DiscNumber: SetDiscNumber(tag, trimmed); break;
+                case MetadataField.Genre: tag.Genres = SplitValues(trimmed); break;
+                case MetadataField.Composer: tag.Composers = SplitValues(trimmed); break;
+            }
+        }
+        file.Save();
+    }
+
+    private static void Add(Dictionary<MetadataField, string> values, MetadataField field, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+            values[field] = value.Trim();
+    }
+
+    private static string[] SplitValues(string value) => value.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+    private static void SetTrackNumber(TagLib.Tag tag, string value)
+    {
+        var parts = value.Split('/', 2, StringSplitOptions.TrimEntries);
+        if (uint.TryParse(parts[0], out var number)) tag.Track = number;
+        if (parts.Length > 1 && uint.TryParse(parts[1], out var count)) tag.TrackCount = count;
+    }
+
+    private static void SetDiscNumber(TagLib.Tag tag, string value)
+    {
+        var parts = value.Split('/', 2, StringSplitOptions.TrimEntries);
+        if (uint.TryParse(parts[0], out var number)) tag.Disc = number;
+        if (parts.Length > 1 && uint.TryParse(parts[1], out var count)) tag.DiscCount = count;
+    }
+
     public static IReadOnlyList<KeyValuePair<string, string>> Read(string? path, AppText text)
     {
         var result = new List<KeyValuePair<string, string>>();
