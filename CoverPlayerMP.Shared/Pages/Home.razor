@@ -351,53 +351,7 @@
             <div class="editor-toolbar">
                 <input class="editor-search" type="search" placeholder="@Text.Search"
                        @bind="editorSearch" @bind:event="oninput" />
-                @if (playlistLayout == PlaylistLayout.Table)
-                {
-                    <button @onclick="RemoveSelectedTrackAsync" disabled="@(!CanRemoveSelected)"
-                            title="@Text.RemoveTrack" aria-label="@Text.RemoveTrack">
-                        <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor"
-                             aria-hidden="true" focusable="false" style="vertical-align: -0.125em;">
-                            <path d="M9 3h6l1 2h4v2H4V5h4z" />
-                            <path d="M6 9h12l-1 11.2a1 1 0 0 1-1 .8H8a1 1 0 0 1-1-.8z" />
-                        </svg>
-                    </button>
-                    <button @onclick="OpenLibraryAsync" title="@Text.AddTrack" aria-label="@Text.AddTrack">+</button>
-                    <button @onclick="ShowSelectedTrackInfo" disabled="@(SelectedTrack is null)"
-                            title="@Text.TrackDetails" aria-label="@Text.TrackDetails">i</button>
-                    <div class="layout-buttons editor-toolbar-layout-buttons">
-                        <button type="button" class="layout-button active"
-                                title="@Text.PlaylistLayoutTable" aria-label="@Text.PlaylistLayoutTable"
-                                @onclick="() => SetPlaylistLayoutAsync(PlaylistLayout.Table)">
-                            <svg viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
-                                <rect x="3" y="4" width="18" height="16" rx="1.5" />
-                                <line x1="3" y1="9" x2="21" y2="9" />
-                                <line x1="3" y1="14" x2="21" y2="14" />
-                                <line x1="3" y1="19" x2="21" y2="19" />
-                            </svg>
-                        </button>
-                        <button type="button" class="layout-button"
-                                title="@Text.PlaylistLayoutLeft" aria-label="@Text.PlaylistLayoutLeft"
-                                @onclick="() => SetPlaylistLayoutAsync(PlaylistLayout.Left)">
-                            <svg viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
-                                <rect x="3" y="4" width="7" height="16" rx="1.2" />
-                                <line x1="13" y1="8" x2="21" y2="8" />
-                                <line x1="13" y1="16" x2="18" y2="16" />
-                            </svg>
-                        </button>
-                        <button type="button" class="layout-button"
-                                title="@Text.PlaylistLayoutRight" aria-label="@Text.PlaylistLayoutRight"
-                                @onclick="() => SetPlaylistLayoutAsync(PlaylistLayout.Right)">
-                            <svg viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
-                                <rect x="14" y="4" width="7" height="16" rx="1.2" />
-                                <line x1="3" y1="8" x2="11" y2="8" />
-                                <line x1="6" y1="16" x2="11" y2="16" />
-                            </svg>
-                        </button>
-                    </div>
-                }
-                else
-                {
-                    <div class="editor-menu-container" @onclick:stopPropagation="true">
+                <div class="editor-menu-container" @onclick:stopPropagation="true">
                         <button type="button" class="editor-menu-button" title="@Text.PlaylistEditorMenu"
                                 aria-label="@Text.PlaylistEditorMenu" aria-expanded="@editorMenuVisible"
                                 @onclick="ToggleEditorMenu">☰</button>
@@ -440,8 +394,7 @@
                                 </button>
                             </div>
                         }
-                    </div>
-                }
+                </div>
             </div>
             @if (selectionMode)
             {
