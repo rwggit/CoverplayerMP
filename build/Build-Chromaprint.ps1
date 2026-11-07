@@ -22,6 +22,14 @@ else {
 if ([string]::IsNullOrWhiteSpace($cmake) -or -not (Test-Path $cmake)) {
 	throw 'CMake wurde nicht gefunden. Installieren Sie die Visual-Studio-Komponente CMake oder fügen Sie CMake dem PATH hinzu.'
 }
+$ninjaCommand = Get-Command ninja -ErrorAction SilentlyContinue
+if ($ninjaCommand) {
+	$ninja = $ninjaCommand.Source
+}
+else {
+	$ninja = Get-ChildItem "${env:ProgramFiles}\Microsoft Visual Studio\*\*\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe" -ErrorAction SilentlyContinue |
+		Select-Object -First 1 -ExpandProperty FullName
+}
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
 	$OutputRoot = Join-Path $scriptRoot '..\native\chromaprint'
 }
@@ -52,16 +60,20 @@ if ($Target -eq 'android-arm64') {
 }
 
 New-Item (Split-Path $archive), $OutputRoot -ItemType Directory -Force | Out-Null
-if (-not (Test-Path $sourceRoot)) {
+if (-not (Test-Path (Join-Path $sourceRoot 'src\include\chromaprint.h'))) {
+	Remove-Item $sourceRoot -Recurse -Force -ErrorAction SilentlyContinue
 	if (-not (Test-Path $archive)) {
 		Write-Host "Lade Chromaprint $Version ..."
 		Invoke-WebRequest $sourceUrl -OutFile $archive
 	}
-	tar -xzf $archive -C (Split-Path $sourceRoot)
+	& tar -xzf $archive --exclude="chromaprint-$Version/src/include/chromaprint.h" -C (Split-Path $sourceRoot)
+	if ($LASTEXITCODE -ne 0) { throw "Das Chromaprint-Archiv konnte nicht entpackt werden (Exitcode $LASTEXITCODE)." }
 	$extracted = Join-Path (Split-Path $sourceRoot) "chromaprint-$Version"
 	if ($extracted -ne $sourceRoot) {
 		Move-Item $extracted $sourceRoot
 	}
+	New-Item (Join-Path $sourceRoot 'src\include') -ItemType Directory -Force | Out-Null
+	Copy-Item (Join-Path $sourceRoot 'src\chromaprint.h') (Join-Path $sourceRoot 'src\include\chromaprint.h') -Force
 }
 
 $cmakeArgs = @(
@@ -135,9 +147,11 @@ switch ($Target) {
 		}
 		$cmakeArgs += @(
 			'-G', 'Ninja',
+			$(if ($ninja) { "-DCMAKE_MAKE_PROGRAM=$ninja" } else { $null }),
 			"-DCMAKE_TOOLCHAIN_FILE=$(Join-Path $AndroidNdk 'build\cmake\android.toolchain.cmake')",
 			'-DANDROID_ABI=arm64-v8a',
-			'-DANDROID_PLATFORM=android-24'
+			'-DANDROID_PLATFORM=android-24',
+			'-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384'
 		)
 	}
 	'ios-arm64' {
@@ -164,13 +178,13 @@ if ($LASTEXITCODE -ne 0) { throw "Der Chromaprint-Build ist fehlgeschlagen (Exit
 if ($LASTEXITCODE -ne 0) { throw "Die Chromaprint-Installation ist fehlgeschlagen (Exitcode $LASTEXITCODE)." }
 
 $nativeFile = if ($Target -eq 'windows-x64') { 'chromaprint.dll' } elseif ($Target -eq 'maccatalyst-arm64') { 'libchromaprint.dylib' } else { 'libchromaprint.so' }
-$installedNativeFile = Get-ChildItem $installRoot -Recurse -File -Filter $nativeFile | Select-Object -First 1
+$nativeOutputFile = Join-Path $installRoot $nativeFile
+$installedNativeFile = Get-ChildItem $installRoot -Recurse -File -Filter $nativeFile |
+	Where-Object { [IO.Path]::GetFullPath($_.FullName) -ne [IO.Path]::GetFullPath($nativeOutputFile) } |
+	Select-Object -First 1
 if (-not $installedNativeFile) {
 	throw "Chromaprint wurde gebaut, aber '$nativeFile' wurde unter '$installRoot' nicht gefunden."
 }
-$nativeOutputFile = Join-Path $installRoot $nativeFile
-if ([IO.Path]::GetFullPath($installedNativeFile.FullName) -ne [IO.Path]::GetFullPath($nativeOutputFile)) {
-	Copy-Item $installedNativeFile.FullName $nativeOutputFile -Force
-}
+Copy-Item $installedNativeFile.FullName $nativeOutputFile -Force
 
 Write-Host "Chromaprint wurde nach '$installRoot' installiert."
