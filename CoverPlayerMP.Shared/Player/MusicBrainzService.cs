@@ -24,6 +24,15 @@ public sealed record AcoustIdMatch(string RecordingId, double Score);
 
 public sealed record AudioFingerprint(string Fingerprint, int DurationSeconds);
 
+public sealed class FingerprintCreationException(string message, Exception? innerException = null)
+    : InvalidOperationException(message, innerException);
+
+public sealed class AcoustIdApiException(string message, bool apiKeyProblem = false)
+    : InvalidOperationException(message)
+{
+    public bool IsApiKeyProblem { get; } = apiKeyProblem;
+}
+
 public sealed class MusicBrainzService
 {
     private readonly HttpClient http;
@@ -85,23 +94,55 @@ public sealed class MusicBrainzService
         return await response.Content.ReadAsByteArrayAsync(cancellationToken);
     }
 
-    public Task<AudioFingerprint> CreateFingerprintAsync(
-        string path, CancellationToken cancellationToken = default) =>
-        fingerprintProvider.CreateAsync(path, cancellationToken);
+    public async Task<AudioFingerprint> CreateFingerprintAsync(
+        string path, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await fingerprintProvider.CreateAsync(path, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new FingerprintCreationException(ex.Message, ex);
+        }
+    }
 
     public async Task<IReadOnlyList<AcoustIdMatch>> FindAcoustIdMatchesAsync(
         AudioFingerprint fingerprint, string apiKey, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(apiKey))
-            throw new InvalidOperationException("Für AcoustID ist ein API-Key erforderlich.");
+            throw new AcoustIdApiException("Für AcoustID ist ein API-Key erforderlich.", apiKeyProblem: true);
 
         var url = $"https://api.acoustid.org/v2/lookup?client={Uri.EscapeDataString(apiKey.Trim())}" +
                   $"&meta=recordings+releasegroups+releases&duration={fingerprint.DurationSeconds}" +
                   $"&fingerprint={Uri.EscapeDataString(fingerprint.Fingerprint)}";
         using var response = await http.GetAsync(url, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var apiKeyProblem = response.StatusCode is System.Net.HttpStatusCode.BadRequest
+                or System.Net.HttpStatusCode.Unauthorized
+                or System.Net.HttpStatusCode.Forbidden;
+            throw new AcoustIdApiException(
+                $"AcoustID antwortete mit HTTP {(int)response.StatusCode}.", apiKeyProblem);
+        }
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+        if (document.RootElement.TryGetProperty("status", out var status) &&
+            !string.Equals(status.GetString(), "ok", StringComparison.OrdinalIgnoreCase))
+        {
+            var errorMessage = document.RootElement.TryGetProperty("error", out var error) &&
+                               error.TryGetProperty("message", out var message)
+                ? message.GetString()
+                : null;
+            throw new AcoustIdApiException(
+                errorMessage ?? "AcoustID hat die Anfrage abgelehnt.",
+                errorMessage?.Contains("client", StringComparison.OrdinalIgnoreCase) == true ||
+                errorMessage?.Contains("key", StringComparison.OrdinalIgnoreCase) == true);
+        }
         if (!document.RootElement.TryGetProperty("results", out var results))
             return [];
 

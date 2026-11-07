@@ -8,6 +8,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CoverPlayerMP.Shared\CoverPlayerMP.Shared.csproj" />
+    <None Include="..\native\chromaprint\$(RuntimeIdentifier)\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('..\native\chromaprint\$(RuntimeIdentifier)')" />
+    <None Include="..\native\chromaprint\LICENSE.chromaprint.txt" Link="LICENSE.chromaprint.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <PackageReference Include="FFmpeg.AutoGen.Abstractions" Version="9.0.1.1" />
     <PackageReference Include="FFmpeg.AutoGen.Bindings.DynamicallyLoaded" Version="9.0.1.1" />
     <PackageReference Include="Openur.ChromaprintStatic" Version="1.6.2.10" />

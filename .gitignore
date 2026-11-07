@@ -11,3 +11,7 @@
 # Test and publish artifacts
 TestResults/
 artifacts/
+/.tmp-publish-web
+/build/.cache
+/native/chromaprint/android-arm64/include
+/native/chromaprint/android-arm64/lib

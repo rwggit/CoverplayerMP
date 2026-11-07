@@ -1353,6 +1353,7 @@
             return;
 
         musicBrainzBusy = true;
+        musicBrainzStatus = Text.MusicBrainzSearching;
         musicBrainzError = null;
         musicBrainzMetadata = null;
         musicBrainzCoverDataUri = null;
@@ -1444,6 +1445,20 @@
                     !string.Equals(currentValue, musicBrainzMetadata.Values[field], StringComparison.Ordinal))
                     selectedMusicBrainzFields.Add(field);
             }
+        }
+        catch (FingerprintCreationException)
+        {
+            musicBrainzError = OperatingSystem.IsAndroid()
+                ? Text.AcoustIdAndroidNativeError
+                : Text.AcoustIdFingerprintError;
+        }
+        catch (AcoustIdApiException ex) when (ex.IsApiKeyProblem)
+        {
+            musicBrainzError = Text.AcoustIdApiKeyError;
+        }
+        catch (AcoustIdApiException)
+        {
+            musicBrainzError = Text.AcoustIdApiError;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException or FileNotFoundException)
         {

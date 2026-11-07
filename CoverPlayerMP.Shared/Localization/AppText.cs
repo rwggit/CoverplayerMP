@@ -287,4 +287,20 @@ public sealed class AppText
     public string AcoustIdSearching => T("Audio-Fingerprint wird erzeugt und AcoustID wird abgefragt …", "Creating audio fingerprint and querying AcoustID …", "Création de l’empreinte audio et interrogation d’AcoustID …");
     public string AcoustIdNoMatch => T("Kein passender AcoustID-/MusicBrainz-Treffer gefunden.", "No matching AcoustID/MusicBrainz result found.", "Aucun résultat AcoustID/MusicBrainz correspondant trouvé.");
     public string AcoustIdError => T("Die Fingerprint-Suche ist fehlgeschlagen. Ist fpcalc installiert und der API-Key gültig?", "Fingerprint search failed. Is fpcalc installed and the API key valid?", "La recherche par empreinte a échoué. fpcalc est-il installé et la clé API valide ?");
+    public string AcoustIdFingerprintError => T(
+        "Der Audio-Fingerprint konnte nicht erzeugt werden. Bitte prüfen Sie, ob fpcalc verfügbar ist (bei einer lokalen Installation im App-/runtimes-Ordner) und ob die Audiodatei gelesen werden kann. Danach die Suche erneut starten.",
+        "The audio fingerprint could not be created. Check that fpcalc is available (in the app/runtimes folder for a local installation) and that the audio file can be read, then try again.",
+        "L’empreinte audio n’a pas pu être créée. Vérifiez que fpcalc est disponible (dans le dossier de l’application/runtimes pour une installation locale) et que le fichier audio est lisible, puis réessayez.");
+    public string AcoustIdAndroidNativeError => T(
+        "Die Fingerprint-Suche ist unter Android nicht verfügbar, weil die native Chromaprint-Bibliothek fehlt oder nicht geladen werden konnte. Bitte die Android-App mit libchromaprint.so für die Zielarchitektur (arm64-v8a) paketieren. fpcalc kann unter Android nicht als Desktop-Prozess gestartet werden.",
+        "Fingerprint search is unavailable on Android because the native Chromaprint library is missing or could not be loaded. Package the Android app with libchromaprint.so for the target architecture (arm64-v8a). fpcalc cannot be started as a desktop process on Android.",
+        "La recherche par empreinte n’est pas disponible sous Android, car la bibliothèque native Chromaprint est absente ou n’a pas pu être chargée. Incluez libchromaprint.so pour l’architecture cible (arm64-v8a). fpcalc ne peut pas être lancé comme processus de bureau sous Android.");
+    public string AcoustIdApiKeyError => T(
+        "AcoustID hat den API-Key abgelehnt. Bitte unter acoustid.org einen gültigen Client/API-Key beantragen, ihn in den Einstellungen ohne zusätzliche Leerzeichen eintragen und die Suche erneut starten.",
+        "AcoustID rejected the API key. Request a valid client/API key at acoustid.org, enter it in Settings without extra spaces, and try again.",
+        "AcoustID a rejeté la clé API. Demandez une clé client/API valide sur acoustid.org, saisissez-la dans les paramètres sans espaces supplémentaires, puis réessayez.");
+    public string AcoustIdApiError => T(
+        "AcoustID konnte nicht abgefragt werden. Prüfen Sie die Internetverbindung und den API-Key. Wenn der Fehler bleibt, die Suche später erneut starten.",
+        "AcoustID could not be queried. Check the internet connection and API key. If the error persists, try again later.",
+        "AcoustID n’a pas pu être interrogé. Vérifiez la connexion Internet et la clé API. Si l’erreur persiste, réessayez plus tard.");
 }

@@ -109,7 +109,6 @@ public sealed unsafe class FfmpegAudioFingerprintProvider : IAudioFingerprintPro
             ReceiveFrames(codecContext, frame, resampler, fingerprinter, cancellationToken);
             FlushResampler(resampler, fingerprinter, cancellationToken);
 
-            fingerprinter.Finish();
             var encoded = EncodeFingerprint(fingerprinter);
             if (string.IsNullOrWhiteSpace(encoded))
                 throw new InvalidOperationException("AcoustID.NET konnte keinen Fingerprint erzeugen.");
@@ -196,7 +195,10 @@ public sealed unsafe class FfmpegAudioFingerprintProvider : IAudioFingerprintPro
     }
 
     private static string EncodeFingerprint(NativeChromaContext fingerprint)
-        => fingerprint.GetFingerprint();
+    {
+        fingerprint.Finish();
+        return fingerprint.GetFingerprint();
+    }
 
     private static double EstimateDuration(AVStream* stream) =>
         stream->duration > 0 && stream->time_base.den != 0

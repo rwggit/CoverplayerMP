@@ -1,0 +1,12 @@
+prefix=C:/Users/Ralf/Documents/Software-Entwicklung/CoverPlayerMP/native/chromaprint/windows-x64
+exec_prefix=C:/Users/Ralf/Documents/Software-Entwicklung/CoverPlayerMP/native/chromaprint/windows-x64/bin
+libdir=C:/Users/Ralf/Documents/Software-Entwicklung/CoverPlayerMP/native/chromaprint/windows-x64/lib
+includedir=C:/Users/Ralf/Documents/Software-Entwicklung/CoverPlayerMP/native/chromaprint/windows-x64/include
+
+Name: chromaprint
+Description: Audio fingerprint library
+URL: http://acoustid.org/chromaprint
+Version: 1.6.2
+Libs: -L${libdir} -lchromaprint
+Cflags: -I${includedir}
+

@@ -27,6 +27,8 @@
            <MauiXaml Update="MyPage.xaml" Inflator="Default" /> (reverts to defaults: Runtime for Debug, XamlC for Release)
            <MauiXaml Update="MyPage.xaml" Inflator="Runtime" /> (force runtime inflation) -->
     <MauiXamlInflator>SourceGen</MauiXamlInflator>
+    <ChromaprintAndroidRoot>$(MSBuildProjectDirectory)\..\native\chromaprint\android-arm64</ChromaprintAndroidRoot>
+    <ChromaprintAndroidLibrary>$(ChromaprintAndroidRoot)\libchromaprint.so</ChromaprintAndroidLibrary>
 
     <!-- Display name -->
     <ApplicationTitle>CoverPlayerMP</ApplicationTitle>
@@ -67,6 +69,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\native\chromaprint\$(TargetFramework)\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('..\native\chromaprint\$(TargetFramework)')" />
+    <None Include="..\native\chromaprint\LICENSE.chromaprint.txt" Link="LICENSE.chromaprint.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
@@ -85,5 +89,13 @@
   <ItemGroup>
     <ProjectReference Include="..\CoverPlayerMP.Shared\CoverPlayerMP.Shared.csproj" />
   </ItemGroup>
+
+  <Target Name="BuildAndroidChromaprint" BeforeTargets="PrepareForBuild" Condition="'$(TargetFramework)' == 'net10.0-android' AND '$(DesignTimeBuild)' != 'true'">
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\build\Build-Chromaprint.ps1&quot; -Target android-arm64 -OutputRoot &quot;$(MSBuildProjectDirectory)\..\native\chromaprint&quot;" />
+    <Error Condition="!Exists('$(ChromaprintAndroidLibrary)')" Text="Android-Chromaprint wurde nicht erzeugt: $(ChromaprintAndroidLibrary)" />
+    <ItemGroup>
+      <AndroidNativeLibrary Include="$(ChromaprintAndroidLibrary)" Link="lib\arm64-v8a\libchromaprint.so" />
+    </ItemGroup>
+  </Target>
 
 </Project>

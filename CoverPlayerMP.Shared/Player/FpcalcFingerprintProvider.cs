@@ -38,7 +38,7 @@ public sealed class FpcalcFingerprintProvider : IAudioFingerprintProvider
         using var document = JsonDocument.Parse(output);
         var root = document.RootElement;
         var fingerprint = root.GetProperty("fingerprint").GetString();
-        var duration = root.GetProperty("duration").GetInt32();
+        var duration = (int)Math.Round(root.GetProperty("duration").GetDouble());
         if (string.IsNullOrWhiteSpace(fingerprint) || duration <= 0)
             throw new InvalidOperationException("fpcalc hat keinen gültigen Fingerprint geliefert.");
 
