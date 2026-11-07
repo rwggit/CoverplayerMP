@@ -344,7 +344,7 @@
 
     @if (editorVisible && !libraryVisible)
     {
-        <section class="library-dialog @(playlistLayout == PlaylistLayout.Table ? null : "library-dialog-pane")" style="--editor-cover-size: @(EditorCoverSizeRem.ToString(System.Globalization.CultureInfo.InvariantCulture))rem; @SubDialogOpacityVars" @onclick="CloseEditorMenu" @onclick:stopPropagation="true">
+        <section class="library-dialog @(playlistLayout == PlaylistLayout.Table ? null : "library-dialog-pane") @(editorHiddenForSubDialog ? "editor-hidden-for-subdialog" : null)" style="--editor-cover-size: @(EditorCoverSizeRem.ToString(System.Globalization.CultureInfo.InvariantCulture))rem; @SubDialogOpacityVars" @onclick="CloseEditorMenu" @onclick:stopPropagation="true">
             <div class="control-dialog-header">
                 <span>@PlaylistEditorTitle (@FilteredPlaylist.Count() @Text.Of @Player.Tracks.Count)</span>
                 <button class="close-button" title="@Text.Close" @onclick="CloseEditor">×</button>
@@ -981,6 +981,12 @@
 
     private void HideControlsForSubDialog() => controlsVisible = false;
 
+    private void HideTrackInfoForSubDialog() => trackInfo = null;
+
+    private bool editorHiddenForSubDialog;
+
+    private void HideEditorForSubDialog() => editorHiddenForSubDialog = true;
+
     private void UpdateWindowButtons() => windowButtonsVisible = WindowControls?.IsFullScreen == true;
 
     private Task PickMusicFolderAsync() => Player.SelectMusicFolderAsync();
@@ -1250,6 +1256,7 @@
 
     private IReadOnlyList<KeyValuePair<string, string>>? trackInfo;
     private string? infoSource;
+    private bool restoreEditorAfterTrackInfo;
 
     private void ShowTrackInfo() => ShowTrackInfo(Player.CurrentTrack);
 
@@ -1268,7 +1275,15 @@
         : track.CoverSource is { } local && File.Exists(local) ? local
         : track.Source;
 
-    private void CloseTrackInfo() => trackInfo = null;
+    private void CloseTrackInfo()
+    {
+        trackInfo = null;
+        if (restoreEditorAfterTrackInfo)
+        {
+            restoreEditorAfterTrackInfo = false;
+            editorHiddenForSubDialog = false;
+        }
+    }
 
     private async Task OpenWikipediaAsync(string value)
     {
@@ -1288,6 +1303,7 @@
     }
 
     private IReadOnlyList<KeyValuePair<string, string>>? rawTags;
+    private IReadOnlyList<KeyValuePair<string, string>>? trackInfoBeforeRawTags;
     private MusicBrainzMetadata? musicBrainzMetadata;
     private IReadOnlyDictionary<MetadataField, string> editableMetadata = new Dictionary<MetadataField, string>();
     private readonly HashSet<MetadataField> selectedMusicBrainzFields = [];
@@ -1303,6 +1319,8 @@
     private void ShowRawTags()
     {
         HideControlsForSubDialog();
+        trackInfoBeforeRawTags = trackInfo;
+        HideTrackInfoForSubDialog();
         musicBrainzMetadata = null;
         musicBrainzError = null;
         currentCoverDataUri = null;
@@ -1318,6 +1336,8 @@
         musicBrainzMetadata = null;
         musicBrainzError = null;
         rawTags = null;
+        trackInfo = trackInfoBeforeRawTags;
+        trackInfoBeforeRawTags = null;
     }
 
     private async Task LoadMusicBrainzAsync()
@@ -1530,10 +1550,13 @@
     };
 
     private IReadOnlyList<KeyValuePair<string, string>>? pictures;
+    private IReadOnlyList<KeyValuePair<string, string>>? trackInfoBeforePictures;
 
     private void ShowPictures()
     {
         HideControlsForSubDialog();
+        trackInfoBeforePictures = trackInfo;
+        HideTrackInfoForSubDialog();
         pictures = TrackMetadata.ReadPictures(infoSource);
     }
 
@@ -1544,6 +1567,8 @@
         newCoverBytes = null;
         newCover = null;
         pictures = null;
+        trackInfo = trackInfoBeforePictures;
+        trackInfoBeforePictures = null;
     }
 
     private byte[]? newCoverBytes;
@@ -1794,17 +1819,17 @@
         }
         if (pictures is not null)
         {
-            _ = InvokeAsync(() => { pictures = null; StateHasChanged(); });
+            _ = InvokeAsync(() => { ClosePictures(); StateHasChanged(); });
             return true;
         }
         if (rawTags is not null)
         {
-            _ = InvokeAsync(() => { rawTags = null; StateHasChanged(); });
+            _ = InvokeAsync(() => { CloseRawTags(); StateHasChanged(); });
             return true;
         }
         if (trackInfo is not null)
         {
-            _ = InvokeAsync(() => { trackInfo = null; StateHasChanged(); });
+            _ = InvokeAsync(() => { CloseTrackInfo(); StateHasChanged(); });
             return true;
         }
         if (editorVisible && !libraryVisible && pendingTrack is null)
@@ -2424,6 +2449,7 @@
     private void OpenEditor()
     {
         HideControlsForSubDialog();
+        HideTrackInfoForSubDialog();
         editorVisible = true;
         editingIndex = null;
         ClearSelection();
@@ -2545,7 +2571,14 @@
     private void ShowSelectedTrackInfo()
     {
         if (SelectedTrack is { } track)
+        {
+            if (playlistLayout == PlaylistLayout.Table)
+            {
+                restoreEditorAfterTrackInfo = editorVisible && !libraryVisible;
+                HideEditorForSubDialog();
+            }
             ShowTrackInfo(track);
+        }
     }
 
     private bool CanRemoveSelected => EffectiveIndices.Count > 0 && removingTrack is null;

@@ -570,6 +570,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .library-dialog-pane .editor-toolbar-layout-buttons { justify-content: flex-end; }
 .library-dialog-pane .selection-toolbar { flex-wrap: wrap; }
 .library-dialog-pane .selection-toolbar span { flex: 1 1 auto; min-width: 6rem; }
+.editor-hidden-for-subdialog { visibility: hidden; pointer-events: none; }
 .library-status { padding: 1rem; color: #c9cde0; }
 .library-table-wrapper { flex: 1; min-height: 0; overflow: auto; }
 .library-table-wrapper,
