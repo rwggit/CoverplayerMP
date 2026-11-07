@@ -6,3 +6,8 @@ public interface IWindowControls
     void Restore();
     void Close();
 }
+
+public interface IExternalBrowser
+{
+    Task OpenAsync(string url);
+}

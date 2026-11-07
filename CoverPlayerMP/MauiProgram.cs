@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.Maui.ApplicationModel;
+using Microsoft.Extensions.Logging;
 using CoverPlayerMP.Player;
 using CoverPlayerMP.Shared.Player;
 
@@ -17,6 +18,7 @@ public static class MauiProgram
             });
 
         builder.Services.AddMauiBlazorWebView();
+        builder.Services.AddSingleton<IExternalBrowser, ExternalBrowser>();
         builder.Services.AddSingleton<CoverPlayerMP.Shared.Localization.AppText>();
         builder.Services.AddSingleton<IPlaylistPlayer, MauiPlaylistPlayer>();
         builder.Services.AddSingleton<HttpClient>();
@@ -37,5 +39,10 @@ public static class MauiProgram
 #endif
 
         return builder.Build();
+    }
+
+    private sealed class ExternalBrowser : IExternalBrowser
+    {
+        public Task OpenAsync(string url) => Launcher.Default.OpenAsync(url);
     }
 }

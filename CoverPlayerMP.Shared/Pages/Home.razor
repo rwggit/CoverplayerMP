@@ -1275,9 +1275,16 @@
         if (string.IsNullOrWhiteSpace(value))
             return;
 
-        var language = Text.Code;
-        var url = $"https://{language}.wikipedia.org/wiki/Special:Search?search={Uri.EscapeDataString(value)}";
-        await Js.InvokeVoidAsync("open", url, "_blank");
+        var language = string.IsNullOrWhiteSpace(Text.Code) ? "de" : Text.Code.Trim();
+        var url = $"https://{language}.wikipedia.org/wiki/Special:Search?search={Uri.EscapeDataString(value.Trim())}";
+        var browser = Services.GetService(typeof(IExternalBrowser)) as IExternalBrowser;
+        if (browser is not null)
+        {
+            await browser.OpenAsync(url);
+            return;
+        }
+
+        await Js.InvokeVoidAsync("open", url);
     }
 
     private IReadOnlyList<KeyValuePair<string, string>>? rawTags;
