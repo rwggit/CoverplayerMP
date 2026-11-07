@@ -69,8 +69,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\native\chromaprint\$(TargetFramework)\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('..\native\chromaprint\$(TargetFramework)')" />
     <None Include="..\native\chromaprint\LICENSE.chromaprint.txt" Link="LICENSE.chromaprint.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <AndroidNativeLibrary Include="$(ChromaprintAndroidLibrary)"
+                          Link="lib\arm64-v8a\libchromaprint.so"
+                          Condition="'$(TargetFramework)' == 'net10.0-android'" />
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
@@ -93,9 +95,6 @@
   <Target Name="BuildAndroidChromaprint" BeforeTargets="PrepareForBuild" Condition="'$(TargetFramework)' == 'net10.0-android' AND '$(DesignTimeBuild)' != 'true'">
     <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\build\Build-Chromaprint.ps1&quot; -Target android-arm64 -OutputRoot &quot;$(MSBuildProjectDirectory)\..\native\chromaprint&quot;" />
     <Error Condition="!Exists('$(ChromaprintAndroidLibrary)')" Text="Android-Chromaprint wurde nicht erzeugt: $(ChromaprintAndroidLibrary)" />
-    <ItemGroup>
-      <AndroidNativeLibrary Include="$(ChromaprintAndroidLibrary)" Link="lib\arm64-v8a\libchromaprint.so" />
-    </ItemGroup>
   </Target>
 
 </Project>

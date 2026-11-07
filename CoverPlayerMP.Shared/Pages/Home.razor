@@ -1419,11 +1419,15 @@
                     selectedMusicBrainzFields.Add(field);
             }
         }
-        catch (FingerprintCreationException)
+        catch (FingerprintCreationException ex)
         {
-            musicBrainzError = OperatingSystem.IsAndroid()
+            var message = OperatingSystem.IsAndroid()
                 ? Text.AcoustIdAndroidNativeError
                 : Text.AcoustIdFingerprintError;
+            var detail = string.Join(" → ", ExceptionMessages(ex));
+            musicBrainzError = string.IsNullOrWhiteSpace(detail)
+                ? message
+                : $"{message} Details: {detail}";
         }
         catch (AcoustIdApiException ex) when (ex.IsApiKeyProblem)
         {
@@ -1441,6 +1445,15 @@
         {
             musicBrainzBusy = false;
             await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private static IEnumerable<string> ExceptionMessages(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            if (!string.IsNullOrWhiteSpace(current.Message))
+                yield return current.Message;
         }
     }
 
@@ -1568,7 +1581,11 @@
         try
         {
             var url = CoverSearcher.Begin(track.Artist, track.Title);
-            await Js.InvokeVoidAsync("open", url, "_blank");
+            var browser = Services.GetService(typeof(IExternalBrowser)) as IExternalBrowser;
+            if (browser is not null)
+                await browser.OpenAsync(url);
+            else
+                await Js.InvokeVoidAsync("open", url, "_blank");
             StateHasChanged();
 
             newCoverBytes = await CoverSearcher.WaitForNewCoverAsync(TimeSpan.FromMinutes(5), cancellation.Token);
@@ -2182,7 +2199,13 @@
         if (youTubeSearchMode == YouTubeSearchMode.SearchPage)
         {
             if (youTubeSearchUrl is not null)
-                await Js.InvokeVoidAsync("open", youTubeSearchUrl, "_blank");
+            {
+                var browser = Services.GetService(typeof(IExternalBrowser)) as IExternalBrowser;
+                if (browser is not null)
+                    await browser.OpenAsync(youTubeSearchUrl);
+                else
+                    await Js.InvokeVoidAsync("open", youTubeSearchUrl, "_blank");
+            }
             return;
         }
 
@@ -2232,7 +2255,13 @@
     private async Task OpenYouTubeExternallyAsync()
     {
         if (selectedYouTubeVideo is not null)
-            await Js.InvokeVoidAsync("open", selectedYouTubeVideo.Url, "_blank");
+        {
+            var browser = Services.GetService(typeof(IExternalBrowser)) as IExternalBrowser;
+            if (browser is not null)
+                await browser.OpenAsync(selectedYouTubeVideo.Url);
+            else
+                await Js.InvokeVoidAsync("open", selectedYouTubeVideo.Url, "_blank");
+        }
     }
 
     private async Task RenderSafeAsync()

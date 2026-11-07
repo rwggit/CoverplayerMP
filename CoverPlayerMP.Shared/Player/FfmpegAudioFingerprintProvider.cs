@@ -20,12 +20,45 @@ public sealed unsafe class FfmpegAudioFingerprintProvider : IAudioFingerprintPro
         cancellationToken.ThrowIfCancellationRequested();
         FfmpegNativeLibraryLoader.EnsureInitialized();
 
-        return Task.Run(() => DecodeAndFingerprint(path, cancellationToken), cancellationToken);
+        return Task.Run(() =>
+        {
+            try
+            {
+                return DecodeAndFingerprint(path, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException(
+                    $"NativeChromaContext/Chromaprint-Verarbeitung fehlgeschlagen: {ex.Message}", ex);
+            }
+        }, cancellationToken);
     }
 
     private static AudioFingerprint DecodeAndFingerprint(string path, CancellationToken cancellationToken)
     {
-        using var fingerprinter = new NativeChromaContext(ChromaprintAlgorithm.TEST2);
+        NativeChromaContext fingerprinter;
+        try
+        {
+            fingerprinter = new NativeChromaContext(ChromaprintAlgorithm.TEST2);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException("NativeChromaContext-Konstruktor fehlgeschlagen: " + ex.Message, ex);
+        }
+
+        using (fingerprinter)
+        {
+            return DecodeAndFingerprintCore(path, cancellationToken, fingerprinter);
+        }
+    }
+
+    private static AudioFingerprint DecodeAndFingerprintCore(
+        string path, CancellationToken cancellationToken, NativeChromaContext fingerprinter)
+    {
 
         AVFormatContext* formatContext = null;
         AVCodecContext* codecContext = null;
@@ -35,8 +68,23 @@ public sealed unsafe class FfmpegAudioFingerprintProvider : IAudioFingerprintPro
 
         try
         {
-            Check(ffmpeg.avformat_open_input(&formatContext, path, null, null), "Die Audiodatei konnte nicht geöffnet werden.");
-            Check(ffmpeg.avformat_find_stream_info(formatContext, null), "Die Audio-Streaminformationen konnten nicht gelesen werden.");
+            try
+            {
+                Check(ffmpeg.avformat_open_input(&formatContext, path, null, null), "Die Audiodatei konnte nicht geöffnet werden.");
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException("FFmpeg avformat_open_input fehlgeschlagen: " + ex.Message, ex);
+            }
+
+            try
+            {
+                Check(ffmpeg.avformat_find_stream_info(formatContext, null), "Die Audio-Streaminformationen konnten nicht gelesen werden.");
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException("FFmpeg avformat_find_stream_info fehlgeschlagen: " + ex.Message, ex);
+            }
 
             var streamIndex = FindAudioStream(formatContext);
             var stream = formatContext->streams[streamIndex];
@@ -80,8 +128,15 @@ public sealed unsafe class FfmpegAudioFingerprintProvider : IAudioFingerprintPro
                 null), "Der FFmpeg-Resampler konnte nicht konfiguriert werden.");
             Check(ffmpeg.swr_init(resampler), "Der FFmpeg-Resampler konnte nicht initialisiert werden.");
 
-            if (!fingerprinter.Start(TargetSampleRate, TargetChannels))
-                throw new InvalidOperationException("AcoustID.NET konnte den Fingerprinter nicht starten.");
+            try
+            {
+                if (!fingerprinter.Start(TargetSampleRate, TargetChannels))
+                    throw new InvalidOperationException("AcoustID.NET konnte den Fingerprinter nicht starten.");
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException("NativeChromaContext.Start fehlgeschlagen: " + ex.Message, ex);
+            }
 
             packet = ffmpeg.av_packet_alloc();
             frame = ffmpeg.av_frame_alloc();
