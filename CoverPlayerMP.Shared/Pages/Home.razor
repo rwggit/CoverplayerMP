@@ -351,6 +351,18 @@
             <div class="editor-toolbar">
                 <input class="editor-search" type="search" placeholder="@Text.Search"
                        @bind="editorSearch" @bind:event="oninput" />
+                @if (Player.IsPlaylistModified)
+                {
+                    <button type="button" class="editor-save-button" title="@Text.SavePlaylist"
+                            aria-label="@Text.SavePlaylist" @onclick="SaveEditorPlaylistAsync">
+                        <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                             aria-hidden="true" focusable="false">
+                            <path d="M4 3h13l3 3v15H4z" />
+                            <path d="M8 3v6h8V3M8 21v-7h8v7" />
+                        </svg>
+                    </button>
+                }
                 <div class="editor-menu-container" @onclick:stopPropagation="true">
                         <button type="button" class="editor-menu-button" title="@Text.PlaylistEditorMenu"
                                 aria-label="@Text.PlaylistEditorMenu" aria-expanded="@editorMenuVisible"
@@ -1650,6 +1662,8 @@
         await Player.SavePlaylistAsync();
         CloseOptions();
     }
+
+    private Task SaveEditorPlaylistAsync() => Player.SavePlaylistAsync();
 
     private sealed class AnimationChoice
     {

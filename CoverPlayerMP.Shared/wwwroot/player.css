@@ -546,6 +546,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
     inset: auto;
     width: auto;
     max-width: none;
+    z-index: 2;
     /* Grid-Items haben standardmäßig min-width: auto, d.h. breiter Tabelleninhalt würde die
        Spaltenbreite sonst über --editor-pane-width hinaus aufziehen und den Resizer verdecken. */
     min-width: 0;
@@ -563,8 +564,8 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 /* Im schmalen Panel reicht die Breite oft nicht für Suchfeld + Schaltflächen in einer Zeile;
    daher erlauben wir Umbruch, erzwingen ihn aber nicht mehr pauschal – so bleibt alles in
    einer Zeile, solange der Anwender das Panel breit genug gezogen hat. */
-.library-dialog-pane .editor-toolbar { flex-wrap: wrap; }
-.library-dialog-pane .editor-toolbar .editor-search { flex: 1 1 6rem; min-width: 6rem; }
+.library-dialog-pane .editor-toolbar { flex-wrap: nowrap; }
+.library-dialog-pane .editor-toolbar .editor-search { flex: 1 1 auto; min-width: 0; }
 .library-dialog-pane .editor-toolbar button { flex: 0 0 auto; }
 .library-dialog-pane .editor-toolbar-layout-buttons { justify-content: flex-end; }
 .library-dialog-pane .selection-toolbar { flex-wrap: wrap; }
@@ -676,6 +677,8 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .editor-toolbar { display: flex; gap: .5rem; align-items: center; margin-bottom: .5rem; }
 .editor-toolbar .editor-search { flex: 1; margin-bottom: 0; }
 .editor-toolbar-layout-buttons { margin-left: auto; padding-left: .5rem; border-left: 1px solid #373c50; }
+.editor-save-button { min-width: 2.25rem; padding-inline: .5rem; color: #fff; background: #c62828; }
+.editor-save-button:hover { background: #e53935; }
 .editor-menu-container { position: relative; flex: 0 0 auto; }
 .editor-menu-button { min-width: 2.25rem; padding-inline: .5rem; font-size: 1.2rem; line-height: 1; }
 .editor-menu {
