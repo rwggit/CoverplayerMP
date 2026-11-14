@@ -1,0 +1,54 @@
+Coverplayer Zutun:
+
+ERLEDIGT: Im Playlisteditor soll auch bei mittiger Anordnung das Hambugermenü anstelle der
+einzelen Buttons hinter dem Suchdialog angezeigt werden, genauso wie bei der rechtsbündigen
+und linksbündigen Anordnung des Playlisteditors
+
+ERLEDIGT: Wenn die aktuelle Playlist geändert wurde, soll im Playlisteditor vor
+dem Hamburgermenü ein Button zum Speichern der aktuellen Playliste
+angezeigt werden. Dieser Button soll rot dargestellt werden, damit
+er nicht übersehen wird.
+  
+TRITT NICHT MEHR AUF: Wenn der Name der Playlist im Playlisteditor zu lang wird, ist das Symbol
+zum Schließen des Dialogs nicht mehr sichtbar. Der zu lange Pfadname
+soll dann als Lauftext angezeigt werden.
+
+ERLEDIGT: Aktuell wird unter Windows die Playersteuerung automatisch eingeblendet,
+wenn die Maus in den unteren Bereich bewegt wird. Das ist so richtig und
+gut. Falls jedoch in das Panel mit der Coveranzeige geklickt oder getippt
+wird, in dem keine ander Schaltlfäche
+liegt, muss der Dialog aber auch angezeigt werden.
+
+ERLEDIGT: Der Dialog, der die Details zum Lied einblenden (Info-Dialog) soll unsichtbar geschaltet
+werden, bevor ein Unterdialog angezeigt wird, damit er bei durchsichtigen Dialogen nicht
+zwischen Unterdialog und Coveranzeige durchscheint
+
+Der Dailog mit den in Einstellungen soll in 2 Register unterteil werden: Einstellungen und Setup
+In des Register Setup auftauchen:
+    Spracheinstellungen
+	API-Keys
+	YouTube Einstellungen
+	...
+
+Beim links- und rechtbündigen Playlisteditor wird das Untermenü, das bei Anwahl
+des Hamburgermenüs aufgeschaltet wird, vom Coverpanel überdeckt.
+	
+Beim Hinzufügen in leere Playlist soll keine Abfrage für die Einfügeposition erfolgen
+
+Beim Hinzufügen eines Lieds soll im Dialog für die Einfügeposition die
+Checkbox "Nicht mehr anzeigen" ergänzt werden. Wenn diese angehakt wird,
+soll bei nachfolgenden Einfügungen die Lieder eingefügt werden, wie beim Verlassen des Dialogs
+mit dieser Checkbox ausgewählt.
+
+Bei der Wiedergabe unter Android auf einem DLNA Gerät dauert es manchmal mehrere
+Sekunden bis nach dem Ende eines Lieds das nächste Lied abgespielt wird.
+Bei ausgeschaltetem Bildschirm wird manchmal ein Lied wiederholt abgespielt.
+(Nach Chuck Berry - Johnny B Goode, vor Beatles - Hey Jude, Playlist Die 500 besten Songs)
+
+
+
+Liedsuche auf Webdav-Server (mit Indexdatei?)
+
+bei Playlist 500 beste Songs werden nur 101 angezeigt
+
+Lieddauer in Playliste Die besten 500 Songs von Hey Jude ist 40:23

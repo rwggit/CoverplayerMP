@@ -1409,6 +1409,12 @@
         await InvokeAsync(StateHasChanged);
         try
         {
+            // SAF-Auswahl liefert unter Android normalerweise eine content://-URI. FFmpeg kann
+            // diese URI nicht direkt öffnen; der Player materialisiert sie vorher im App-Cache.
+            var localSource = await Player.ResolveLocalSourceAsync(track);
+            if (!string.IsNullOrWhiteSpace(localSource))
+                infoSource = localSource;
+
             var fingerprint = await MusicBrainzSearcher.CreateFingerprintAsync(infoSource);
             var match = (await MusicBrainzSearcher.FindAcoustIdMatchesAsync(fingerprint, acoustIdApiKey)).FirstOrDefault();
             musicBrainzMetadata = match is null

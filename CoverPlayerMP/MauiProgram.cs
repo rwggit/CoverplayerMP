@@ -25,10 +25,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<CoverPlayerMP.Shared.Player.CoverSearch>();
         builder.Services.AddSingleton<CoverPlayerMP.Shared.Player.YouTubeSearchService>();
         builder.Services.AddSingleton<CoverPlayerMP.Shared.Player.MusicBrainzService>();
-        builder.Services.AddSingleton<IAudioFingerprintProvider>(_ =>
-            OperatingSystem.IsAndroid() || FfmpegNativeLibraryLoader.HasChromaprintLibrary(AppContext.BaseDirectory)
-                ? new FfmpegAudioFingerprintProvider()
-                : new FpcalcFingerprintProvider());
+        builder.Services.AddSingleton<IAudioFingerprintProvider, NativeFirstAudioFingerprintProvider>();
 #if WINDOWS
         builder.Services.AddSingleton<IWindowControls, CoverPlayerMP.Platforms.Windows.WindowControls>();
 #endif

@@ -34,6 +34,23 @@ public sealed partial class MauiPlaylistPlayer(AppText text) : IPlaylistPlayer, 
     public IReadOnlyList<Track> Tracks => tracks;
     public string? PlaylistPath => playlistPath;
     public Track? CurrentTrack => currentIndex >= 0 && currentIndex < tracks.Count ? tracks[currentIndex] : null;
+
+    public Task<string?> ResolveLocalSourceAsync(Track? track, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (track is null)
+            return Task.FromResult<string?>(null);
+
+#if ANDROID
+        return Task.FromResult<string?>(ResolveAndroidSource(track.Source));
+#else
+        if (File.Exists(track.Source))
+            return Task.FromResult<string?>(track.Source);
+        if (PlaylistParser.IsHttpUrl(track.Source))
+            return Task.FromResult<string?>(DownloadToCache(track.Source));
+        return Task.FromResult<string?>(null);
+#endif
+    }
     public int CurrentIndex => currentIndex;
     public double Position => audioPlayer?.CurrentPosition ?? 0;
     public double Duration => audioPlayer?.Duration ?? 0;

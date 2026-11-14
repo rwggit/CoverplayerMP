@@ -7,6 +7,9 @@ public interface IPlaylistPlayer : IAsyncDisposable
     IReadOnlyList<Track> Tracks { get; }
     string? PlaylistPath => null;
     Track? CurrentTrack { get; }
+    /// <summary>Returns a local file suitable for native metadata/fingerprint processing.</summary>
+    Task<string?> ResolveLocalSourceAsync(Track? track, CancellationToken cancellationToken = default) =>
+        Task.FromResult(track is { Source: { } source } && File.Exists(source) ? source : null);
     int CurrentIndex { get; }
     double Position { get; }
     double Duration { get; }
