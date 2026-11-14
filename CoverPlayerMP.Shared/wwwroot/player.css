@@ -424,6 +424,26 @@
 
 .control-dialog-header span { margin-right: auto; }
 
+.settings-tabs {
+    display: flex;
+    gap: .25rem;
+    border-bottom: 1px solid #51576d;
+}
+.settings-tab {
+    flex: 1;
+    padding: .5rem .75rem;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: .4rem .4rem 0 0;
+    background: transparent;
+    color: #c9cde0;
+}
+.settings-tab.active {
+    border-bottom-color: #8a7cff;
+    background: #37315f;
+    color: #fff;
+}
+
 .close-button {
     flex: 0 0 auto;
     width: 2.25rem;

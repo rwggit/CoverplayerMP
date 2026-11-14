@@ -71,6 +71,7 @@ public sealed class AppText
     public string WikipediaTitle => T("Wikipedia-Seite zum Titel öffnen", "Open the title's Wikipedia page", "Ouvrir la page Wikipédia du titre");
     public string PlayerControls => T("Player-Steuerung", "Player controls", "Commandes du lecteur");
     public string Settings => T("Einstellungen", "Settings", "Paramètres");
+    public string Setup => T("Einrichtung", "Setup", "Configuration");
     public string HideControls => T("Steuerung ausblenden", "Hide controls", "Masquer les commandes");
     public string OpenPlaylist => T("Playlist öffnen", "Open playlist", "Ouvrir la playlist");
     public string EditPlaylist => T("Playlist bearbeiten", "Edit playlist", "Modifier la playlist");

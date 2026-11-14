@@ -777,6 +777,18 @@
                 </div>
                 @if (!quitConfirmVisible)
                 {
+                    <div class="settings-tabs" role="tablist" aria-label="@Text.Settings">
+                        <button type="button" class="settings-tab @(!setupTabActive ? "active" : null)" role="tab"
+                                aria-selected="@(!setupTabActive)" @onclick="() => setupTabActive = false">
+                            @Text.Settings
+                        </button>
+                        <button type="button" class="settings-tab @(setupTabActive ? "active" : null)" role="tab"
+                                aria-selected="@setupTabActive" @onclick="() => setupTabActive = true">
+                            @Text.Setup
+                        </button>
+                    </div>
+                    @if (!setupTabActive)
+                    {
                     <label class="setting-row">
                         <span>@Text.Crossfade</span>
                         <input type="range" min="0" max="5" step="0.1"
@@ -814,6 +826,9 @@
                                @oninput="OnSubDialogTransparencyChanged" />
                         <span class="setting-value">@subDialogTransparencyPercent %</span>
                     </label>
+                    }
+                    @if (setupTabActive)
+                    {
                     <label class="setting-row">
                         <span>@Text.PlaylistLayoutLabel</span>
                         <div class="layout-buttons">
@@ -878,6 +893,9 @@
                             <small class="setting-hint">@Text.YouTubeApiKeyHint</small>
                         </label>
                     }
+                    }
+                    @if (!setupTabActive)
+                    {
                     <button @onclick="OpenAnimationsAsync">@Text.Animations</button>
                     @if (Player.SupportsRemotePlayback)
                     {
@@ -890,6 +908,7 @@
                     else if (Player.IsPlaylistModified)
                     {
                         <button @onclick="SaveOnlyAsync">@Text.SavePlaylist</button>
+                    }
                     }
                 }
                 else
@@ -1680,11 +1699,13 @@
 
     private bool optionsVisible;
     private bool quitConfirmVisible;
+    private bool setupTabActive;
 
     private void OpenOptions()
     {
         HideControlsForSubDialog();
         quitConfirmVisible = false;
+        setupTabActive = false;
         optionsVisible = true;
     }
 
