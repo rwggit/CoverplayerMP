@@ -19,6 +19,7 @@ public sealed class WebPlaylistPlayer(IJSRuntime js, AppText text) : IPlaylistPl
     private double position;
     private double duration;
     private string? errorMessage;
+    private CancellationTokenSource? playbackLimitCancellation;
 
     public event EventHandler? StateChanged;
     public IReadOnlyList<Track> Tracks => tracks;
@@ -37,6 +38,7 @@ public sealed class WebPlaylistPlayer(IJSRuntime js, AppText text) : IPlaylistPl
         }
     }
     public double CrossfadeSeconds { get => crossfadeSeconds; set => crossfadeSeconds = Math.Clamp(value, 0, 5); }
+    public double MaxPlaybackSeconds { get; set; }
     public bool IsPlaying => isPlaying;
     public bool IsPaused => isPaused;
     public string? ErrorMessage => errorMessage;
@@ -65,6 +67,7 @@ public sealed class WebPlaylistPlayer(IJSRuntime js, AppText text) : IPlaylistPl
     {
         if (tracks.Count == 0)
             return;
+        playbackLimitCancellation?.Cancel();
         currentIndex = Math.Clamp(index, 0, tracks.Count - 1);
         var track = tracks[currentIndex];
         try
@@ -83,10 +86,13 @@ public sealed class WebPlaylistPlayer(IJSRuntime js, AppText text) : IPlaylistPl
             isPaused = false;
         }
         await UpdateStateAsync(cancellationToken);
+        if (isPlaying && MaxPlaybackSeconds > 0)
+            StartPlaybackLimit(Math.Max(0, MaxPlaybackSeconds - Position));
     }
 
     public async Task PauseAsync(CancellationToken cancellationToken = default)
     {
+        playbackLimitCancellation?.Cancel();
         await js.InvokeVoidAsync("coverPlayer.pause", cancellationToken);
         isPlaying = false;
         isPaused = true;
@@ -224,7 +230,34 @@ public sealed class WebPlaylistPlayer(IJSRuntime js, AppText text) : IPlaylistPl
         StateChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public ValueTask DisposeAsync()
+    {
+        playbackLimitCancellation?.Cancel();
+        playbackLimitCancellation?.Dispose();
+        playbackLimitCancellation = null;
+        return ValueTask.CompletedTask;
+    }
+
+    private void StartPlaybackLimit(double remainingSeconds)
+    {
+        playbackLimitCancellation?.Dispose();
+        playbackLimitCancellation = new CancellationTokenSource();
+        var token = playbackLimitCancellation.Token;
+        _ = EnforcePlaybackLimitAsync(remainingSeconds, token);
+    }
+
+    private async Task EnforcePlaybackLimitAsync(double remainingSeconds, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(remainingSeconds), cancellationToken);
+            if (isPlaying && MaxPlaybackSeconds > 0)
+                await NextAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
 
     private sealed record AudioState(double Position, double Duration);
 }

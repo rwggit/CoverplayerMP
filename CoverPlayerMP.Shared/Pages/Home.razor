@@ -826,6 +826,13 @@
                                @oninput="OnSubDialogTransparencyChanged" />
                         <span class="setting-value">@subDialogTransparencyPercent %</span>
                     </label>
+                    <label class="setting-row">
+                        <span>@Text.MaxPlaybackDuration</span>
+                        <input type="number" min="0" step="1"
+                               value="@maxPlaybackSeconds.ToString("0", System.Globalization.CultureInfo.InvariantCulture)"
+                               @oninput="OnMaxPlaybackDurationChanged" />
+                        <small class="setting-hint">@Text.MaxPlaybackDurationHint</small>
+                    </label>
                     }
                     @if (setupTabActive)
                     {
@@ -1929,7 +1936,9 @@
     }
 
     private const string CrossfadeKey = "coverPlayer.crossfadeSeconds";
+    private const string MaxPlaybackDurationKey = "coverPlayer.maxPlaybackDuration";
     private const string CoverFadeKey = "coverPlayer.coverFadeSeconds";
+    private double maxPlaybackSeconds;
     private double coverFadeSeconds = 2;
     private const string EditorCoverSizeKey = "coverPlayer.editorCoverSize";
     private const string SubDialogTransparencyKey = "coverPlayer.subDialogTransparencyPercent";
@@ -1960,6 +1969,21 @@
             Text.Language = language;
             await SaveSettingAsync(LanguageKey, language.ToString());
         }
+    }
+
+    private async Task OnMaxPlaybackDurationChanged(ChangeEventArgs args)
+    {
+        if (string.IsNullOrWhiteSpace(args.Value?.ToString()))
+            maxPlaybackSeconds = 0;
+        else if (!double.TryParse(args.Value?.ToString(), System.Globalization.NumberStyles.Float,
+                     System.Globalization.CultureInfo.InvariantCulture, out var seconds))
+            return;
+        else
+            maxPlaybackSeconds = Math.Max(0, seconds);
+
+        Player.MaxPlaybackSeconds = maxPlaybackSeconds;
+        await SaveSettingAsync(MaxPlaybackDurationKey,
+            maxPlaybackSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
     private void OnLanguageChangedEvent(object? sender, EventArgs e)
@@ -2014,6 +2038,12 @@
             if (double.TryParse(crossfade, System.Globalization.NumberStyles.Float,
                     System.Globalization.CultureInfo.InvariantCulture, out var seconds))
                 Player.CrossfadeSeconds = Math.Clamp(seconds, 0, 5);
+
+            var maxPlaybackDuration = await Js.InvokeAsync<string?>("localStorage.getItem", MaxPlaybackDurationKey);
+            if (double.TryParse(maxPlaybackDuration, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var parsedMaxPlaybackDuration))
+                maxPlaybackSeconds = Math.Max(0, parsedMaxPlaybackDuration);
+            Player.MaxPlaybackSeconds = maxPlaybackSeconds;
 
             var coverFade = await Js.InvokeAsync<string?>("localStorage.getItem", CoverFadeKey);
             if (double.TryParse(coverFade, System.Globalization.NumberStyles.Float,

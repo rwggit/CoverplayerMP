@@ -23,32 +23,55 @@ ERLEDIGT: Der Dialog, der die Details zum Lied einblenden (Info-Dialog) soll uns
 werden, bevor ein Unterdialog angezeigt wird, damit er bei durchsichtigen Dialogen nicht
 zwischen Unterdialog und Coveranzeige durchscheint
 
-Der Dailog mit den in Einstellungen soll in 2 Register unterteil werden: Einstellungen und Setup
+ERLEDIGT: Der Dailog mit den in Einstellungen soll in 2 Register unterteil werden: Einstellungen und Setup
 In des Register Setup auftauchen:
     Spracheinstellungen
 	API-Keys
 	YouTube Einstellungen
 	...
 
-Beim links- und rechtbündigen Playlisteditor wird das Untermenü, das bei Anwahl
-des Hamburgermenüs aufgeschaltet wird, vom Coverpanel überdeckt.
-	
-Beim Hinzufügen in leere Playlist soll keine Abfrage für die Einfügeposition erfolgen
+ERLEDIGT:Der Dialog, der "Lied entfernen", "Lied hinzufügen, "Details zum Lied" usw.
+enthält und bei Anwahl des Buttons mit dem Hamburgermenü-Symbol im links-
+oder rechtsbündigen Playlisteditor aufgerufen wird, wird von dem Panel,
+das das Cover des aktuell abgespielten Lieds möglichst groß anzeigt und
+rechts, bzw. links vom Playlisteditor liegt, überdeckt.
+@file:CoverPlayerMP.Shared\Pages\Home.razor
+css-styles in @file:CoverPlayerMP.Shared\wwwroot\player.css
+
+Bei der Wiedergabe über DLNA wird bei ausgeschaltetem Bildschirm das nächste
+Lied nicht abgespielt, oder das aktuelle Lied in einer Endlosschleife wiederholt.
+
+Bei der Wiedergabe über DLNA funktioniert das Überblenden nicht korrekt und kann
+auch nicht aktiviert werden, da dazu zwei Streams gleichzeitig wiedergegeben
+werden müssen, was DLNA wohl nicht unterstützt. Das vorige Lied soll aber trotzdem
+ausgeblendet werden und nicht abrupt abbrechen.
+
+Im Menü des Playlisteditors, das über den Button mit dem  Hamburgermenü-Symbol
+aufgerufen wird, soll der
+Menüpunkt "Neue Playlist" ergänzt werden. Bei Anwahl soll eine neue Playlist mit
+Name "Neue Playlist" erzeugt werden. Falls die aktuelle Playlist geändert wurde, sollte
+zuvor das Speichern der Änderungen angeboten werden.
+
+Der Name der aktuellen Playlist im Playlisteditor soll über Klick auf die Titelleiste, die bereits
+den aktuellen Playlistenamen anzeigt, änderbar sein. Ebenso soll er über den neuen
+Menüpunkt "Name ändern" im Hamburgermenü des Playlisteditors änderbar sein.
+
+Beim Hinzufügen in leere Playlist, z.B. aus der Auflistung der Audiodateiten nach Anwahl
+der Lupe, dem soll keine Abfrage für die Einfügeposition erfolgen.
 
 Beim Hinzufügen eines Lieds soll im Dialog für die Einfügeposition die
 Checkbox "Nicht mehr anzeigen" ergänzt werden. Wenn diese angehakt wird,
 soll bei nachfolgenden Einfügungen die Lieder eingefügt werden, wie beim Verlassen des Dialogs
 mit dieser Checkbox ausgewählt.
 
-Bei der Wiedergabe unter Android auf einem DLNA Gerät dauert es manchmal mehrere
-Sekunden bis nach dem Ende eines Lieds das nächste Lied abgespielt wird.
-Bei ausgeschaltetem Bildschirm wird manchmal ein Lied wiederholt abgespielt.
-(Nach Chuck Berry - Johnny B Goode, vor Beatles - Hey Jude, Playlist Die 500 besten Songs)
-
-
-
-Liedsuche auf Webdav-Server (mit Indexdatei?)
-
 bei Playlist 500 beste Songs werden nur 101 angezeigt
 
 Lieddauer in Playliste Die besten 500 Songs von Hey Jude ist 40:23
+
+In den Einstellungen soll der Text Cover-Größe durch Covergröße in Tabelle ersetzt werden.
+Die Slider sollen einheitlich unterhalb ihrer Beschriftung angezeigt werden.
+
+Die Durchsichtigkeit der Dialoge soll als Standardwert auf 35% gesetzt werden.
+
+Falls mehere Cover in einer Audiodatei vorliegen, soll das Front-Cover verwendet werden.
+

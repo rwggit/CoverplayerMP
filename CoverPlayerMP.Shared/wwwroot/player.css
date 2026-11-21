@@ -192,6 +192,13 @@
 .player-shell-split-left .pane-resizer { grid-column: 2; }
 .player-shell-split-right .pane-resizer { grid-column: 2; }
 
+/* Overlay-Fenster im Split-Layout müssen nicht überdecken */
+.control-dialog,
+.insert-overlay .insert-dialog,
+.library-dialog {
+    z-index: 10;
+}
+
 .cover-image {
     display: block;
     width: 100%;
@@ -700,22 +707,52 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .editor-toolbar-layout-buttons { margin-left: auto; padding-left: .5rem; border-left: 1px solid #373c50; }
 .editor-save-button { min-width: 2.25rem; padding-inline: .5rem; color: #fff; background: #c62828; }
 .editor-save-button:hover { background: #e53935; }
-.editor-menu-container { position: relative; flex: 0 0 auto; }
-.editor-menu-button { min-width: 2.25rem; padding-inline: .5rem; font-size: 1.2rem; line-height: 1; }
+
+
+
+
+.editor-menu-container {
+    position: relative;
+    flex: 0 0 auto;
+    z-index: 35;
+}
+
+.editor-menu-button {
+    min-width: 2.25rem;
+    padding-inline: .5rem;
+    font-size: 1.2rem;
+    line-height: 1;
+}
+
 .editor-menu {
-    position: absolute;
-    z-index: 5;
-    top: calc(100% + .35rem);
-    right: 0;
+    position: fixed;
+    /* Kein top/left/right/bottom setzen, damit das Menü vertikal unter dem Button bleibt,
+       aber visuell aus dem overflow: hidden von .library-dialog-pane ausbricht. */
+    z-index: 35;
     display: flex;
     flex-direction: column;
     min-width: 12rem;
+    max-width: calc(100vw - 1rem);
+    margin-top: .35rem;
     padding: .3rem;
     border: 1px solid #51576d;
     border-radius: .5rem;
     background: #252938;
     box-shadow: 0 .75rem 2rem rgb(0 0 0 / 45%);
+    /* Klappt standardmäßig nach links auf (rechtsbündig zum Button), damit es im normalen
+       Dialog und im rechtsbündigen Split-Layout nicht rechts abgeschnitten wird: */
+    transform: translateX(calc(-100% + 2.25rem));
 }
+/* Im linksbündigen Split-Layout sitzt der Button nah am linken Fensterrand.
+   Hier klappt das Menü nach rechts (in Richtung Cover) auf, damit es links nicht abgeschnitten wird: */
+.player-shell-split-left .editor-menu {
+    transform: translateX(0);
+}
+
+
+
+
+
 .editor-menu button { display: flex; width: 100%; gap: .6rem; align-items: center; padding: .55rem .7rem; border: 0; border-radius: .3rem; text-align: left; }
 .editor-menu button svg { flex: 0 0 auto; }
 .editor-menu-symbol { display: inline-grid; flex: 0 0 1em; place-items: center; font-size: 1.15em; font-weight: 600; line-height: 1; }
@@ -731,7 +768,10 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 }
 .editor-table td.editor-link { cursor: pointer; }
 .editor-table td.editor-link:hover { text-decoration: underline; }
-{ width: calc(var(--editor-cover-size, 5rem) + .5rem); padding: .25rem; }
+.editor-table td.editor-cover-cell {
+    width: calc(var(--editor-cover-size, 5rem) + .5rem);
+    padding: .25rem;
+}
 .editor-cover {
     position: relative;
     display: block;
@@ -870,6 +910,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .library-dialog {
     background: rgb(24 27 37 / var(--subdialog-surface-opacity, 1));
 }
+
 .insert-dialog {
     display: flex;
     flex-direction: column;
@@ -902,3 +943,4 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .insert-dialog::-webkit-scrollbar-thumb:hover {
     background: #6d7590;
 }
+
