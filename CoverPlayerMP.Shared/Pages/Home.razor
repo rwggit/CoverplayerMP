@@ -647,6 +647,13 @@
                             }
                         </dd>
                     }
+                    @if (!trackInfo.Any(e => e.Key == Text.CoverPictures))
+                    {
+                        <dt>@Text.CoverPictures</dt>
+                        <dd>0 <button class="info-button info-inline" title="@Text.ShowCoverPictures" aria-label="@Text.ShowCoverPictures"
+                                    @onclick="ShowPictures">i</button>
+                        </dd>
+                    }
                 </dl>
             </section>
         </div>
